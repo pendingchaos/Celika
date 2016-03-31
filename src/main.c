@@ -57,7 +57,13 @@ int main() {
         
         Uint64 end = SDL_GetPerformanceCounter();
         
-        frametime = (end-start) / SDL_GetPerformanceFrequency();
+        frametime = (end-start) / (double)SDL_GetPerformanceFrequency();
+        
+        char title[256];
+        static const char* fmt = "%s - %.0f mspf";
+        snprintf(title, sizeof(title), fmt, PROJNAME, frametime*1000);
+        
+        SDL_SetWindowTitle(win, title);
     }
     
     quit(EXIT_SUCCESS);
