@@ -93,28 +93,32 @@ static void place_yumyum(yumyum_t* yumyum) {
 
 static void update_snake(float frametime) {
     const Uint8* keys = SDL_GetKeyboardState(NULL);
-    if (keys[SDL_SCANCODE_LEFT] && dir_key!=SDL_SCANCODE_RIGHT) {
+    if ((keys[SDL_SCANCODE_LEFT] || keys[SDL_SCANCODE_A]) &&
+        dir_key!=SDL_SCANCODE_RIGHT) {
         dir[0] = -1;
         dir[1] = 0;
         dir_key = SDL_SCANCODE_LEFT;
         state = state==STATE_PAUSED ? STATE_PLAYING : state;
     }
     
-    if (keys[SDL_SCANCODE_RIGHT] && dir_key!=SDL_SCANCODE_LEFT) {
+    if ((keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) &&
+        dir_key!=SDL_SCANCODE_LEFT) {
         dir[0] = 1;
         dir[1] = 0;
         dir_key = SDL_SCANCODE_RIGHT;
         state = state==STATE_PAUSED ? STATE_PLAYING : state;
     }
     
-    if (keys[SDL_SCANCODE_DOWN] && dir_key!=SDL_SCANCODE_UP) {
+    if ((keys[SDL_SCANCODE_DOWN] || keys[SDL_SCANCODE_S]) &&
+        dir_key!=SDL_SCANCODE_UP) {
         dir[0] = 0;
         dir[1] = -1;
         dir_key = SDL_SCANCODE_DOWN;
         state = state==STATE_PAUSED ? STATE_PLAYING : state;
     }
     
-    if (keys[SDL_SCANCODE_UP] && dir_key!=SDL_SCANCODE_DOWN) {
+    if ((keys[SDL_SCANCODE_UP] || keys[SDL_SCANCODE_W]) &&
+        dir_key!=SDL_SCANCODE_DOWN) {
         dir[0] = 0;
         dir[1] = 1;
         dir_key = SDL_SCANCODE_UP;
@@ -164,7 +168,7 @@ static void update_snake(float frametime) {
     }
 }
 
-void game_init() {
+void snake_game_init() {
     srand(time(NULL));
     
     points = 0;
@@ -189,7 +193,7 @@ void game_init() {
     state = STATE_PAUSED;
 }
 
-void game_deinit() {
+void snake_game_deinit() {
     snake_bit_t* cur = head;
     while (cur) {
         snake_bit_t* bit = cur;
@@ -198,7 +202,7 @@ void game_deinit() {
     }
 }
 
-void game_frame(size_t w, size_t h, float frametime) {
+void snake_game_frame(size_t w, size_t h, float frametime) {
     draw_begin(w, h);
     
     float col[] = {0.5, 0.5, 1.0};
