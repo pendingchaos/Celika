@@ -35,6 +35,9 @@ int main() {
     
     bool running = true;
     float frametime = 1 / 60.0;
+    
+    game_init();
+    
     while (running) {
         Uint64 start = SDL_GetPerformanceCounter();
         
@@ -49,14 +52,10 @@ int main() {
         
         int w, h;
         SDL_GetWindowSize(win, &w, &h);
-        draw_begin(w, h);
-        
         game_frame(w, h, frametime);
-        
         SDL_GL_SwapWindow(win);
         
         Uint64 end = SDL_GetPerformanceCounter();
-        
         frametime = (end-start) / (double)SDL_GetPerformanceFrequency();
         
         char title[256];
@@ -65,6 +64,8 @@ int main() {
         
         SDL_SetWindowTitle(win, title);
     }
+    
+    game_deinit();
     
     quit(EXIT_SUCCESS);
     return 0;
