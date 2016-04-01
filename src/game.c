@@ -9,7 +9,15 @@
 #include <time.h>
 
 #define TILE_SIZE 20
+#define WIDTH (500/TILE_SIZE)
+#define HEIGHT (500/TILE_SIZE)
 #define NUM_YUMYUMS 10
+
+typedef enum state_t {
+    STATE_PAUSED,
+    STATE_PLAYING,
+    STATE_LOST
+} state_t;
 
 typedef struct snake_bit_t {
     int x, y;
@@ -21,6 +29,7 @@ typedef struct yumyum_t {
     int x, y;
 } yumyum_t;
 
+static state_t state = STATE_PAUSED;
 static snake_bit_t* head = NULL;
 static yumyum_t yumyums[NUM_YUMYUMS];
 static Uint64 last_move = 0;
@@ -54,25 +63,31 @@ static void draw_yumyums() {
     }
 }
 
-static void place_yumyum(yumyum_t* yumyum) {
-    bool used = true;
-    while (used) {
-        yumyum->x = rand() % (500/TILE_SIZE);
-        yumyum->y = rand() % (500/TILE_SIZE);
-        
-        used = false;
-        for (size_t i = 0; i < NUM_YUMYUMS; i++)
-            if (yumyums+i != yumyum)
-                if (yumyum->x==yumyums[i].x && yumyum->y==yumyums[i].y)
-                    used = true;
-        
-        snake_bit_t* bit = head;
-        while (bit) {
-            if (yumyum->x==bit->x && yumyum->y==bit->y)
-                used = true;
-            bit = bit->next;
-        }
+static bool used(int x, int y) {
+    for (size_t i = 0; i < NUM_YUMYUMS; i++)
+        if (x==yumyums[i].x && y==yumyums[i].y)
+            return true;
+    
+    snake_bit_t* bit = head;
+    while (bit) {
+        if (x==bit->x && y==bit->y)
+            return true;
+        bit = bit->next;
     }
+    
+    return false;
+}
+
+static void place_yumyum(yumyum_t* yumyum) {
+    yumyum->x = -1;
+    yumyum->y = -1;
+    int x, y;
+    do {
+        x = rand() % WIDTH;
+        y = rand() % HEIGHT;
+    } while (used(x, y));
+    yumyum->x = x;
+    yumyum->y = y;
 }
 
 static void update_snake(float frametime) {
@@ -80,31 +95,41 @@ static void update_snake(float frametime) {
     if (keys[SDL_SCANCODE_LEFT]) {
         dir[0] = -1;
         dir[1] = 0;
+        state = state==STATE_PAUSED ? STATE_PLAYING : state;
     } else if (keys[SDL_SCANCODE_RIGHT]) {
         dir[0] = 1;
         dir[1] = 0;
+        state = state==STATE_PAUSED ? STATE_PLAYING : state;
     } else if (keys[SDL_SCANCODE_DOWN]) {
         dir[0] = 0;
         dir[1] = -1;
+        state = state==STATE_PAUSED ? STATE_PLAYING : state;
     } else if (keys[SDL_SCANCODE_UP]) {
         dir[0] = 0;
         dir[1] = 1;
+        state = state==STATE_PAUSED ? STATE_PLAYING : state;
     }
     
-    for (size_t i = 0; i < NUM_YUMYUMS; i++) {
-        int hx = head->x;
-        int hy = head->y;
-        yumyum_t* yumyum = yumyums + i;
-        if (yumyum->x==hx && yumyum->y==hy) {
-            place_yumyum(yumyum);
-            points++;
-        }
-    }
-    
-    if (SDL_GetPerformanceCounter()-last_move > move_interval) {
+    if (SDL_GetPerformanceCounter()-last_move > move_interval &&
+        state==STATE_PLAYING) {
         snake_bit_t* new_head = malloc(sizeof(snake_bit_t));
         new_head->x = head->x + dir[0];
         new_head->y = head->y + dir[1];
+        
+        for (size_t i = 0; i < NUM_YUMYUMS; i++) {
+            int hx = new_head->x;
+            int hy = new_head->y;
+            yumyum_t* yumyum = yumyums + i;
+            if (yumyum->x==hx && yumyum->y==hy) {
+                place_yumyum(yumyum);
+                points++;
+            }
+        }
+        
+        if (used(new_head->x, new_head->y)) state = STATE_LOST;
+        if (new_head->x < 0 || new_head->x>WIDTH) state = STATE_LOST;
+        if (new_head->y < 0 || new_head->y>HEIGHT) state = STATE_LOST;
+        
         new_head->next = head;
         new_head->prev = NULL;
         head->prev = new_head;
@@ -126,7 +151,6 @@ static void update_snake(float frametime) {
         
         last_move = SDL_GetPerformanceCounter();
     }
-    
 }
 
 void game_init() {
@@ -158,12 +182,12 @@ void game_deinit() {
 }
 
 void game_frame(size_t w, size_t h, float frametime) {
-    update_snake(frametime);
-    
     draw_begin(w, h);
     
     float col[] = {0.5, 0.5, 1.0};
     draw_clear(col);
+    
+    update_snake(frametime);
     
     draw_snake();
     draw_yumyums();
