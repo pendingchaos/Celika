@@ -29,14 +29,19 @@ static size_t points = 0;
 static int dir[2] = {0, 0};
 
 static void draw_snake() {
-    snake_bit_t* cur = head;
+    snake_bit_t* cur = head->next;
     while (cur) {
         float pos[] = {TILE_SIZE*(int)cur->x, TILE_SIZE*(int)cur->y};
         float size[] = {TILE_SIZE, TILE_SIZE};
-        float col[] = {1.0, 0.5, 0.5};
+        float col[] = {0.5, 1.0, 0.5};
         draw_add_rect(pos, size, col);
         cur = cur->next;
     }
+    
+    float pos[] = {TILE_SIZE*(int)head->x, TILE_SIZE*(int)head->y};
+    float size[] = {TILE_SIZE, TILE_SIZE};
+    float col[] = {0.2, 1.0, 0.2};
+    draw_add_rect(pos, size, col);
 }
 
 static void draw_yumyums() {
@@ -44,8 +49,29 @@ static void draw_yumyums() {
         yumyum_t* yumyum = yumyums + i;
         float pos[] = {TILE_SIZE*yumyum->x, TILE_SIZE*yumyum->y};
         float size[] = {TILE_SIZE, TILE_SIZE};
-        float col[] = {0.5, 1.0, 0.5};
+        float col[] = {1.0, 0.5, 0.5};
         draw_add_rect(pos, size, col);
+    }
+}
+
+static void place_yumyum(yumyum_t* yumyum) {
+    bool used = true;
+    while (used) {
+        yumyum->x = rand() % (500/TILE_SIZE);
+        yumyum->y = rand() % (500/TILE_SIZE);
+        
+        used = false;
+        for (size_t i = 0; i < NUM_YUMYUMS; i++)
+            if (yumyums+i != yumyum)
+                if (yumyum->x==yumyums[i].x && yumyum->y==yumyums[i].y)
+                    used = true;
+        
+        snake_bit_t* bit = head;
+        while (bit) {
+            if (yumyum->x==bit->x && yumyum->y==bit->y)
+                used = true;
+            bit = bit->next;
+        }
     }
 }
 
@@ -70,8 +96,7 @@ static void update_snake(float frametime) {
         int hy = head->y;
         yumyum_t* yumyum = yumyums + i;
         if (yumyum->x==hx && yumyum->y==hy) {
-            yumyum->x = rand() % (500/TILE_SIZE); //TODO Ensure there is not yumyum at this location
-            yumyum->y = rand() % (500/TILE_SIZE);
+            place_yumyum(yumyum);
             points++;
         }
     }
@@ -112,9 +137,12 @@ void game_init() {
     head->next = head->prev = NULL;
     
     for (size_t i = 0; i < NUM_YUMYUMS; i++) {
-        yumyums[i].x = rand() % (500/TILE_SIZE);
-        yumyums[i].y = rand() % (500/TILE_SIZE);
+        yumyums[i].x = -1;
+        yumyums[i].y = -1;
     }
+    
+    for (size_t i = 0; i < NUM_YUMYUMS; i++)
+        place_yumyum(yumyums+i);
     
     last_move = SDL_GetPerformanceCounter();
     move_interval = SDL_GetPerformanceFrequency() / 20;
