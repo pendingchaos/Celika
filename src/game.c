@@ -32,10 +32,11 @@ typedef struct yumyum_t {
 static state_t state = STATE_PAUSED;
 static snake_bit_t* head = NULL;
 static yumyum_t yumyums[NUM_YUMYUMS];
-static Uint64 last_move = 0;
+static Uint64 last_move;
 static Uint64 move_interval;
-static size_t points = 0;
-static int dir[2] = {0, 0};
+static size_t points;
+static int dir[2];
+static SDL_Scancode dir_key;
 
 static void draw_snake() {
     snake_bit_t* cur = head->next;
@@ -92,21 +93,31 @@ static void place_yumyum(yumyum_t* yumyum) {
 
 static void update_snake(float frametime) {
     const Uint8* keys = SDL_GetKeyboardState(NULL);
-    if (keys[SDL_SCANCODE_LEFT]) {
+    if (keys[SDL_SCANCODE_LEFT] && dir_key!=SDL_SCANCODE_RIGHT) {
         dir[0] = -1;
         dir[1] = 0;
+        dir_key = SDL_SCANCODE_LEFT;
         state = state==STATE_PAUSED ? STATE_PLAYING : state;
-    } else if (keys[SDL_SCANCODE_RIGHT]) {
+    }
+    
+    if (keys[SDL_SCANCODE_RIGHT] && dir_key!=SDL_SCANCODE_LEFT) {
         dir[0] = 1;
         dir[1] = 0;
+        dir_key = SDL_SCANCODE_RIGHT;
         state = state==STATE_PAUSED ? STATE_PLAYING : state;
-    } else if (keys[SDL_SCANCODE_DOWN]) {
+    }
+    
+    if (keys[SDL_SCANCODE_DOWN] && dir_key!=SDL_SCANCODE_UP) {
         dir[0] = 0;
         dir[1] = -1;
+        dir_key = SDL_SCANCODE_DOWN;
         state = state==STATE_PAUSED ? STATE_PLAYING : state;
-    } else if (keys[SDL_SCANCODE_UP]) {
+    }
+    
+    if (keys[SDL_SCANCODE_UP] && dir_key!=SDL_SCANCODE_DOWN) {
         dir[0] = 0;
         dir[1] = 1;
+        dir_key = SDL_SCANCODE_UP;
         state = state==STATE_PAUSED ? STATE_PLAYING : state;
     }
     
@@ -127,8 +138,8 @@ static void update_snake(float frametime) {
         }
         
         if (used(new_head->x, new_head->y)) state = STATE_LOST;
-        if (new_head->x < 0 || new_head->x>WIDTH) state = STATE_LOST;
-        if (new_head->y < 0 || new_head->y>HEIGHT) state = STATE_LOST;
+        if (new_head->x < 0 || new_head->x>WIDTH-1) state = STATE_LOST;
+        if (new_head->y < 0 || new_head->y>HEIGHT-1) state = STATE_LOST;
         
         new_head->next = head;
         new_head->prev = NULL;
@@ -156,6 +167,9 @@ static void update_snake(float frametime) {
 void game_init() {
     srand(time(NULL));
     
+    points = 0;
+    memset(dir, 0, sizeof(dir));
+    
     head = malloc(sizeof(snake_bit_t));
     head->x = head->y = 0;
     head->next = head->prev = NULL;
@@ -170,6 +184,9 @@ void game_init() {
     
     last_move = SDL_GetPerformanceCounter();
     move_interval = SDL_GetPerformanceFrequency() / 20;
+    dir_key = 0;
+    
+    state = STATE_PAUSED;
 }
 
 void game_deinit() {
@@ -193,4 +210,6 @@ void game_frame(size_t w, size_t h, float frametime) {
     draw_yumyums();
     
     draw_prims();
+    
+    if (state == STATE_LOST) game_init();
 }
