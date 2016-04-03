@@ -33,9 +33,14 @@ int main() {
     ctx = SDL_GL_CreateContext(win);
     if (!ctx) FAIL(SDL_GetError());
     
+    SDL_assert_release(SDL_GL_ExtensionSupported("GL_EXT_framebuffer_sRGB"));
+    SDL_assert_release(SDL_GL_ExtensionSupported("GL_EXT_texture_sRGB"));
+    glEnable(GL_FRAMEBUFFER_SRGB_EXT);
+    
     bool running = true;
     float frametime = 1 / 60.0;
     
+    draw_init();
     game_init();
     
     while (running) {
@@ -66,6 +71,7 @@ int main() {
     }
     
     game_deinit();
+    draw_deinit();
     
     quit(EXIT_SUCCESS);
     return 0;
