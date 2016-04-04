@@ -41,7 +41,10 @@ int main() {
     float frametime = 1 / 60.0;
     
     draw_init();
-    game_init();
+    
+    int winw, winh;
+    game_init(&winw, &winh);
+    SDL_SetWindowSize(win, winw, winh);
     
     while (running) {
         Uint64 start = SDL_GetPerformanceCounter();

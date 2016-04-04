@@ -3,10 +3,10 @@
 #define GAME_H
 
 #include <stddef.h>
-void snake_game_init();
+void snake_game_init(int* w, int* h);
 void snake_game_frame(size_t w, size_t h, float frametime);
 void snake_game_deinit();
-void shooty_thing_game_init();
+void shooty_thing_game_init(int* w, int* h);
 void shooty_thing_game_frame(size_t w, size_t h, float frametime);
 void shooty_thing_game_deinit();
 

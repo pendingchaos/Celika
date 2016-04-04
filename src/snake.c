@@ -43,15 +43,13 @@ static void draw_snake() {
     while (cur) {
         float pos[] = {TILE_SIZE*(int)cur->x, TILE_SIZE*(int)cur->y};
         float size[] = {TILE_SIZE, TILE_SIZE};
-        float col[] = {0.5, 1.0, 0.5};
-        draw_add_rect(pos, size, col);
+        draw_add_rect(pos, size, draw_rgb(0.5, 1, 0.5));
         cur = cur->next;
     }
     
     float pos[] = {TILE_SIZE*(int)head->x, TILE_SIZE*(int)head->y};
     float size[] = {TILE_SIZE, TILE_SIZE};
-    float col[] = {0.2, 1.0, 0.2};
-    draw_add_rect(pos, size, col);
+    draw_add_rect(pos, size, draw_rgb(0.2, 1, 0.2));
 }
 
 static void draw_yumyums() {
@@ -59,8 +57,7 @@ static void draw_yumyums() {
         yumyum_t* yumyum = yumyums + i;
         float pos[] = {TILE_SIZE*yumyum->x, TILE_SIZE*yumyum->y};
         float size[] = {TILE_SIZE, TILE_SIZE};
-        float col[] = {1.0, 0.5, 0.5};
-        draw_add_rect(pos, size, col);
+        draw_add_rect(pos, size, draw_rgb(1, 0.5, 0.5));
     }
 }
 
@@ -168,9 +165,7 @@ static void update_snake(float frametime) {
     }
 }
 
-void snake_game_init() {
-    srand(time(NULL));
-    
+static void setup_state() {
     points = 0;
     memset(dir, 0, sizeof(dir));
     
@@ -193,7 +188,7 @@ void snake_game_init() {
     state = STATE_PAUSED;
 }
 
-void snake_game_deinit() {
+static void free_state() {
     snake_bit_t* cur = head;
     while (cur) {
         snake_bit_t* bit = cur;
@@ -202,11 +197,22 @@ void snake_game_deinit() {
     }
 }
 
+void snake_game_init(int* w, int* h) {
+    *w = *h = 500;
+    
+    srand(time(NULL));
+    
+    setup_state();
+}
+
+void snake_game_deinit() {
+    free_state();
+}
+
 void snake_game_frame(size_t w, size_t h, float frametime) {
     draw_begin(w, h);
     
-    float col[] = {0.5, 0.5, 1.0};
-    draw_clear(col);
+    draw_clear(draw_rgb(0.5, 0.5, 1));
     
     update_snake(frametime);
     
@@ -215,5 +221,8 @@ void snake_game_frame(size_t w, size_t h, float frametime) {
     
     draw_prims();
     
-    if (state == STATE_LOST) game_init();
+    if (state == STATE_LOST) {
+        free_state();
+        setup_state();
+    }
 }
