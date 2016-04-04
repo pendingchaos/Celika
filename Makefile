@@ -1,6 +1,6 @@
 PROJNAME = unnamedgame
 CFLAGS = -pedantic -Wall -std=c11 -g `sdl2-config --cflags` -DPROJNAME=\"$(PROJNAME)\"
-LDFLAGS = `sdl2-config --libs` -lGL -lm -lSOIL
+LDFLAGS = `sdl2-config --libs` -lGL -lm
 OUTPUT = $(PROJNAME)
 RUN_OPT =
 PREFIX = /usr/local
