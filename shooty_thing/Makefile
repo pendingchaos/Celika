@@ -5,7 +5,7 @@ CELIKA_DIR = ../celika/
 include $(CELIKA_DIR)Makefile
 
 shooty_thing: $(CELIKA_DEPS)
-	@gcc src/shooty_thing.c $(CELIKA_LDFLAGS) -o shooty_thing -g
+	gcc src/shooty_thing.c $(CELIKA_LDFLAGS) -I$(CELIKA_DIR)inc -o shooty_thing -g
 
 .PHONY: clean
 clean:

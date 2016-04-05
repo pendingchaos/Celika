@@ -1,6 +1,4 @@
-#include "celika/game.h"
-#include "celika/draw.h"
-#include "celika/list.h"
+#include "celika/celika.h"
 
 #include <SDL2/SDL_keyboard.h>
 #include <SDL2/SDL_mouse.h>
@@ -298,7 +296,7 @@ static void cleanup_state() {
     list_free(player_proj);
 }
 
-void game_init(int* w, int* h) {
+void celika_game_init(int* w, int* h) {
     *w = WINDOW_WIDTH;
     *h = WINDOW_HEIGHT;
     
@@ -323,7 +321,7 @@ void game_init(int* w, int* h) {
     setup_state();
 }
 
-void game_deinit() {
+void celika_game_deinit() {
     cleanup_state();
     
     draw_del_effect(passthough_effect);
@@ -338,7 +336,7 @@ void game_deinit() {
     draw_del_tex(player_tex);
 }
 
-void game_frame(size_t w, size_t h, float frametime) {
+void celika_game_frame(size_t w, size_t h, float frametime) {
     if (state == STATE_PLAYING)
         update(frametime);
     else if (state == STATE_LOST) {

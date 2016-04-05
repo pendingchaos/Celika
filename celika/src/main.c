@@ -1,3 +1,4 @@
+#include "audio.h"
 #include "draw.h"
 #include "game.h"
 
@@ -14,13 +15,13 @@ static SDL_Window* win = NULL;
 static SDL_GLContext ctx = NULL;
 
 static void quit() {
-    SDL_GL_DeleteContext(ctx);
-    SDL_DestroyWindow(win);
+    if (ctx) SDL_GL_DeleteContext(ctx);
+    if (win) SDL_DestroyWindow(win);
     SDL_Quit();
 }
 
 int main() {
-    SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER);
+    SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_TIMER);
     
     win = SDL_CreateWindow("Celika",
                            SDL_WINDOWPOS_UNDEFINED,
@@ -42,10 +43,11 @@ int main() {
     bool running = true;
     float frametime = 1 / 60.0;
     
+    audio_init(44100, 4096);
     draw_init();
     
     int winw, winh;
-    game_init(&winw, &winh);
+    celika_game_init(&winw, &winh);
     SDL_SetWindowSize(win, winw, winh);
     
     while (running) {
@@ -64,7 +66,7 @@ int main() {
         SDL_GetWindowSize(win, &w, &h);
         
         draw_begin(w, h);
-        game_frame(w, h, frametime);
+        celika_game_frame(w, h, frametime);
         draw_end();
         
         SDL_GL_SwapWindow(win);
@@ -79,8 +81,9 @@ int main() {
         SDL_SetWindowTitle(win, title);
     }
     
-    game_deinit();
+    celika_game_deinit();
     draw_deinit();
+    audio_deinit();
     
     quit(EXIT_SUCCESS);
     return 0;

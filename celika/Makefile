@@ -1,5 +1,5 @@
-CELIKA_CFLAGS = -pedantic -Wall -std=c11 -g `sdl2-config --cflags` -DGL_GLEXT_PROTOTYPES -I$(CELIKA_DIR)inc/celika
-CELIKA_LDFLAGS = `sdl2-config --libs` -lGL -lm $(CELIKA_DIR)libcelika.a
+CELIKA_CFLAGS = -pedantic -Wall -std=c11 -g `sdl2-config --cflags` `pkg-config vorbisfile --cflags` -DGL_GLEXT_PROTOTYPES -I$(CELIKA_DIR)inc/celika
+CELIKA_LDFLAGS = `sdl2-config --libs` `pkg-config vorbisfile --libs` -lGL -lm $(CELIKA_DIR)libcelika.a
 CELIKA_DEPS = libcelika.a
 
 CELIKA_TARGET = $@
@@ -13,7 +13,7 @@ celika_dep = $(celika_obj:.o=.d)
 libcelika.a: $(celika_obj)
 	@ar rcs $(CELIKA_DIR)libcelika.a $(celika_obj)
 
-include $(celika_dep)
+-include $(celika_dep)
 
 .%.celika.d: %.c
 	@# -M:  generate Makefile rule

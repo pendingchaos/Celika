@@ -5,7 +5,7 @@ CELIKA_DIR = ../celika/
 include $(CELIKA_DIR)Makefile
 
 snake: $(CELIKA_DEPS)
-	@gcc snake.c $(CELIKA_LDFLAGS) -o snake -g
+	@gcc snake.c $(CELIKA_LDFLAGS) -I$(CELIKA_DIR)inc -o snake -g
 
 .PHONY: clean
 clean:

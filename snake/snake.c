@@ -1,6 +1,4 @@
-#include "celika/game.h"
-#include "celika/draw.h"
-#include "celika/list.h"
+#include "celika/celika.h"
 
 #include <SDL2/SDL_keyboard.h>
 #include <SDL2/SDL_timer.h>
@@ -180,7 +178,11 @@ static void free_state() {
     list_free(bits);
 }
 
-void game_init(int* w, int* h) {
+static sound_t* sound;
+void celika_game_init(int* w, int* h) {
+    sound = audio_create_sound("SpaceShooterRedux/Bonus/sfx_laser2.ogg");
+    audio_play_sound(sound, 1);
+    
     *w = *h = 500;
     
     srand(time(NULL));
@@ -188,11 +190,13 @@ void game_init(int* w, int* h) {
     setup_state();
 }
 
-void game_deinit() {
+void celika_game_deinit() {
+    audio_del_sound(sound);
+    
     free_state();
 }
 
-void game_frame(size_t w, size_t h, float frametime) {
+void celika_game_frame(size_t w, size_t h, float frametime) {
     draw_add_aabb(create_aabb_lbwh(0, 0, w, h), draw_rgb(0.5, 0.5, 1));
     
     update_snake(frametime);
