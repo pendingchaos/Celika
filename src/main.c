@@ -35,6 +35,8 @@ int main() {
     
     SDL_assert_release(SDL_GL_ExtensionSupported("GL_EXT_framebuffer_sRGB"));
     SDL_assert_release(SDL_GL_ExtensionSupported("GL_EXT_texture_sRGB"));
+    SDL_assert_release(SDL_GL_ExtensionSupported("GL_ARB_texture_float"));
+    SDL_assert_release(SDL_GL_ExtensionSupported("GL_ARB_framebuffer_object"));
     glEnable(GL_FRAMEBUFFER_SRGB_EXT);
     
     bool running = true;
@@ -60,7 +62,11 @@ int main() {
         
         int w, h;
         SDL_GetWindowSize(win, &w, &h);
+        
+        draw_begin(w, h);
         game_frame(w, h, frametime);
+        draw_end();
+        
         SDL_GL_SwapWindow(win);
         
         Uint64 end = SDL_GetPerformanceCounter();

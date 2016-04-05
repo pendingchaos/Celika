@@ -1,4 +1,5 @@
 #include "draw.h"
+#include "list.h"
 #include "builtinfont.h"
 #include "stb_image.h"
 
@@ -7,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 #include <math.h>
 
 struct draw_tex_t {
@@ -14,11 +16,39 @@ struct draw_tex_t {
     aabb_t aabb;
 };
 
+typedef struct effect_param_t {
+    char name[64];
+    bool is_tex;
+    union {
+        GLuint tex;
+        float fval;
+    };
+} effect_param_t;
+
+struct draw_effect_t {
+    GLuint program;
+    list_t* params; //list of effect_param_t
+};
+
+struct draw_fb_t {
+    GLuint fb;
+    GLuint tex;
+};
+
+typedef struct batch_t {
+    draw_tex_t* tex;
+    size_t vert_count;
+    float* pos;
+    float* col;
+    float* uv;
+} batch_t;
+
 static draw_tex_t* cur_tex = 0;
 static size_t vert_count = 0;
 static float* pos = NULL;
 static float* col = NULL;
 static float* uv = NULL;
+static list_t* batches; //list of batch_t
 static size_t width = 0;
 static size_t height = 0;
 static draw_tex_t* builtin_font_tex;
@@ -32,7 +62,7 @@ static float scale_origin_y = 0;
 
 void draw_init() {
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     
     GLuint font_tex_id;
     glGenTextures(1, &font_tex_id);
@@ -62,9 +92,28 @@ void draw_init() {
     builtin_font_tex->id = font_tex_id;
     builtin_font_tex->aabb = create_aabb_lbwh(0, 0, BUILTIN_FONT_WIDTH*128,
                                               BUILTIN_FONT_HEIGHT);
+    
+    batches = list_new(sizeof(batch_t), NULL);
+    
+    printf("OpenGL version: %s\n", glGetString(GL_VERSION));
+    printf("OpenGL vendor: %s\n", glGetString(GL_VENDOR));
+    printf("OpenGL renderer: %s\n", glGetString(GL_RENDERER));
+    printf("GLSL version: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 }
 
 void draw_deinit() {
+    for (size_t i = 0; i < list_len(batches); i++) {
+        batch_t* batch = list_nth(batches, i);
+        free(batch->pos);
+        free(batch->col);
+        free(batch->uv);
+    }
+    list_free(batches);
+    
+    free(pos);
+    free(col);
+    free(uv);
+    
     glDeleteTextures(1, &builtin_font_tex->id);
     free(builtin_font_tex);
 }
@@ -95,6 +144,8 @@ draw_tex_t* draw_create_tex(const char* filename, int* w, int* h) {
                  GL_RGBA, GL_UNSIGNED_BYTE, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     
     stbi_image_free(data);
     
@@ -104,9 +155,6 @@ draw_tex_t* draw_create_tex(const char* filename, int* w, int* h) {
         if (h)
             glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, h);
     }
-    
-    if (cur_tex) glBindTexture(GL_TEXTURE_2D, cur_tex->id);
-    else glBindTexture(GL_TEXTURE_2D, 0);
     
     draw_tex_t* res = malloc(sizeof(draw_tex_t));
     res->id = tex;
@@ -154,11 +202,80 @@ aabb_t draw_get_tex_aabb(draw_tex_t* tex) {
     return tex->aabb;
 }
 
+draw_effect_t* draw_create_effect(const char* shdr_fname) {
+    FILE* file = fopen(shdr_fname, "r");
+    if (!file) {
+        fprintf(stderr, "Failed to open %s: %s\n", shdr_fname, strerror(errno));
+        exit(1);
+    }
+    
+    fseek(file, 0, SEEK_END);
+    int size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    
+    char* source = malloc(size+1);
+    source[size] = 0;
+    fread(source, size, 1, file);
+    
+    fclose(file);
+    
+    char* sources[] = {
+"#version 120\n"
+"#define GET_TEXEL(tex, coord) texture2D(tex, (coord)/vec2(tex##_dim))\n"
+"#line 1\n", source};
+    
+    GLuint shdr = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(shdr, 2, (const GLchar**)sources, NULL);
+    free(source);
+    glCompileShader(shdr);
+    char log[1024];
+    glGetShaderInfoLog(shdr, sizeof(log), NULL, log);
+    printf("%s compile info log: %s\n", shdr_fname, log);
+    
+    GLuint program = glCreateProgram();
+    glAttachShader(program, shdr);
+    glLinkProgram(program);
+    glDeleteShader(shdr);
+    memset(log, 0, sizeof(log));
+    glGetProgramInfoLog(shdr, sizeof(log), NULL, log);
+    printf("%s link info log: %s\n", shdr_fname, log);
+    
+    glValidateProgram(program);
+    memset(log, 0, sizeof(log));
+    glGetProgramInfoLog(shdr, sizeof(log), NULL, log);
+    printf("%s validate info log: %s\n", shdr_fname, log);
+    
+    draw_effect_t* effect = malloc(sizeof(draw_effect_t));
+    effect->program = program;
+    
+    effect->params = list_new(sizeof(effect_param_t), NULL);
+    
+    return effect;
+}
+
+void draw_del_effect(draw_effect_t* effect) {
+    list_free(effect->params);
+    glDeleteProgram(effect->program);
+    free(effect);
+}
+
 void draw_set_tex(draw_tex_t* tex) {
     if (tex == cur_tex) return;
-    if (vert_count) draw_prims();
-    if (tex) glBindTexture(GL_TEXTURE_2D, tex->id);
-    else glBindTexture(GL_TEXTURE_2D, 0);
+    if (vert_count) {
+        batch_t batch;
+        batch.tex = cur_tex;
+        batch.vert_count = vert_count;
+        batch.pos = pos;
+        batch.col = col;
+        batch.uv = uv;
+        list_append(batches, &batch);
+        
+        vert_count = 0;
+        pos = NULL;
+        col = NULL;
+        uv = NULL;
+    }
+    
     cur_tex = tex;
 }
 
@@ -170,11 +287,6 @@ void draw_begin(size_t w, size_t h) {
 
 void draw_end() {
     draw_prims();
-}
-
-void draw_clear(draw_col_t col) {
-    glClearColor(col.r, col.g, col.b, col.a);
-    glClear(GL_COLOR_BUFFER_BIT);
 }
 
 void draw_set_orientation(float degrees, float ox, float oy) {
@@ -253,19 +365,43 @@ void draw_add_aabb(aabb_t aabb, draw_col_t col) {
     draw_add_rect(pos, size, col);
 }
 
-void draw_prims() {
-    if (!vert_count) return;
+static draw_fb_t* create_fb() {
+    draw_fb_t* res = malloc(sizeof(draw_fb_t));
     
-    glViewport(0, 0, width, height);
+    glGenTextures(1, &res->tex);
+    glBindTexture(GL_TEXTURE_2D, res->tex);
     
-    if (cur_tex) glEnable(GL_TEXTURE_2D);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0,
+                 GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    
+    glBindTexture(GL_TEXTURE_2D, 0);
+    
+    glGenFramebuffers(1, &res->fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, res->fb);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, res->tex, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    return res;
+}
+
+static void draw_batch(batch_t batch) {
+    if (!batch.vert_count) return;
+    
+    if (batch.tex) {
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, batch.tex->id);
+    }
     
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_COLOR_ARRAY);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-    glVertexPointer(2, GL_FLOAT, 0, pos);
-    glColorPointer(4, GL_FLOAT, 0, col);
-    glTexCoordPointer(2, GL_FLOAT, 0, uv);
+    glVertexPointer(2, GL_FLOAT, 0, batch.pos);
+    glColorPointer(4, GL_FLOAT, 0, batch.col);
+    glTexCoordPointer(2, GL_FLOAT, 0, batch.uv);
     
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
@@ -273,7 +409,7 @@ void draw_prims() {
     glTranslatef(-1, -1, 0);
     glScalef(1.0/width*2, 1.0/height*2, 1);
     
-    glDrawArrays(GL_TRIANGLES, 0, vert_count);
+    glDrawArrays(GL_TRIANGLES, 0, batch.vert_count);
     
     glPopMatrix();
     
@@ -281,14 +417,138 @@ void draw_prims() {
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
     
-    if (cur_tex) glDisable(GL_TEXTURE_2D);
+    if (batch.tex) glDisable(GL_TEXTURE_2D);
+    
+    free(batch.pos);
+    free(batch.col);
+    free(batch.uv);
+}
+
+void draw_prims() {
+    glViewport(0, 0, width, height);
+    
+    for (size_t i = 0; i < list_len(batches); i++)
+        draw_batch(*(batch_t*)list_nth(batches, i));
+    
+    batch_t batch;
+    batch.tex = cur_tex;
+    batch.vert_count = vert_count;
+    batch.pos = pos;
+    batch.col = col;
+    batch.uv = uv;
+    draw_batch(batch);
+    
+    list_free(batches);
+    batches = list_new(sizeof(batch_t), NULL);
     
     vert_count = 0;
-    
-    free(pos);
-    free(col);
-    free(uv);
     pos = col = uv = NULL;
+}
+
+draw_fb_t* draw_prims_fb() {
+    draw_fb_t* res = create_fb();
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res->fb);
+    
+    draw_prims();
+    
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    return res;
+}
+
+static void effect_param(draw_effect_t* effect, const char* name, effect_param_t param) {
+    strncpy(param.name, name, sizeof(param.name));
+    
+    for (size_t i = 0; i < list_len(effect->params); i++) {
+        effect_param_t* other_param = list_nth(effect->params, i);
+        if (!strcmp(name, other_param->name)) {
+            *other_param = param;
+            return;
+        }
+    }
+    
+    list_append(effect->params, &param);
+}
+
+void draw_effect_param_float(draw_effect_t* effect, const char* name, float val) {
+    effect_param_t param;
+    param.is_tex = false;
+    param.fval = val;
+    effect_param(effect, name, param);
+}
+
+void draw_effect_param_fb(draw_effect_t* effect, const char* name, draw_fb_t* val) {
+    effect_param_t param;
+    param.is_tex = true;
+    param.tex = val->tex;
+    effect_param(effect, name, param);
+}
+
+void draw_do_effect(draw_effect_t* effect) {
+    static float pos[] = {-1, -1, 1, -1, 1, 1, -1, 1};
+    static float uv[] = {0, 0, 1, 0, 1, 1, 0, 1};
+    
+    glUseProgram(effect->program);
+    
+    size_t next_unit = 1;
+    
+    for (size_t i = 0; i < list_len(effect->params); i++) {
+        effect_param_t* param = list_nth(effect->params, i);
+        GLint loc = glGetUniformLocation(effect->program, param->name);
+        if (loc < 0) {
+            printf("warning: param \"%s\" not found\n", param->name);
+            continue;
+        }
+        
+        if (param->is_tex) {
+            glActiveTexture(GL_TEXTURE0+next_unit);
+            glBindTexture(GL_TEXTURE_2D, param->tex);
+            glUniform1i(loc, next_unit);
+            next_unit++;
+            
+            char name[256];
+            snprintf(name, sizeof(name), "%s_dim", param->name);
+            
+            GLint dim_loc = glGetUniformLocation(effect->program, name);
+            if (dim_loc >= 0) {
+                GLint w, h;
+                glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
+                glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
+                glUniform2f(dim_loc, w, h);
+            }
+        } else {
+            glUniform1f(loc, param->fval);
+        }
+    }
+    
+    glActiveTexture(GL_TEXTURE0);
+    
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glVertexPointer(2, GL_FLOAT, 0, pos);
+    glTexCoordPointer(2, GL_FLOAT, 0, uv);
+    
+    glDrawArrays(GL_QUADS, 0, 4);
+    
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    
+    glUseProgram(0);
+}
+
+draw_fb_t* draw_do_effect_fb(draw_effect_t* effect) {
+    draw_fb_t* res = create_fb();
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res->fb);
+    
+    draw_do_effect(effect);
+    
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    return res;
+}
+
+void draw_free_fb(draw_fb_t* fb) {
+    glDeleteFramebuffers(1, &fb->fb);
+    glDeleteTextures(1, &fb->tex);
+    free(fb);
 }
 
 void draw_text(const char* text, float* pos, draw_col_t col, float height) {
@@ -316,6 +576,10 @@ void draw_text(const char* text, float* pos, draw_col_t col, float height) {
     }
     
     draw_set_tex(0);
+}
+
+float draw_text_width(const char* text, float height) {
+    return height/BUILTIN_FONT_HEIGHT * BUILTIN_FONT_WIDTH * strlen(text);
 }
 
 draw_col_t draw_rgb(float r, float g, float b) {

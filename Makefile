@@ -1,5 +1,6 @@
 PROJNAME = unnamedgame
-CFLAGS = -pedantic -Wall -std=c11 -g `sdl2-config --cflags` -DPROJNAME=\"$(PROJNAME)\"
+CFLAGS = -pedantic -Wall -std=c11 -g `sdl2-config --cflags` -DPROJNAME=\"$(PROJNAME)\"\
+		 -DGL_GLEXT_PROTOTYPES
 LDFLAGS = `sdl2-config --libs` -lGL -lm
 OUTPUT = $(PROJNAME)
 RUN_OPT =
