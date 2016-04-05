@@ -1,6 +1,6 @@
-#include "game.h"
-#include "draw.h"
-#include "list.h"
+#include "celika/game.h"
+#include "celika/draw.h"
+#include "celika/list.h"
 
 #include <SDL2/SDL_keyboard.h>
 #include <SDL2/SDL_mouse.h>
@@ -298,7 +298,7 @@ static void cleanup_state() {
     list_free(player_proj);
 }
 
-void shooty_thing_game_init(int* w, int* h) {
+void game_init(int* w, int* h) {
     *w = WINDOW_WIDTH;
     *h = WINDOW_HEIGHT;
     
@@ -323,7 +323,7 @@ void shooty_thing_game_init(int* w, int* h) {
     setup_state();
 }
 
-void shooty_thing_game_deinit() {
+void game_deinit() {
     cleanup_state();
     
     draw_del_effect(passthough_effect);
@@ -338,7 +338,7 @@ void shooty_thing_game_deinit() {
     draw_del_tex(player_tex);
 }
 
-void shooty_thing_game_frame(size_t w, size_t h, float frametime) {
+void game_frame(size_t w, size_t h, float frametime) {
     if (state == STATE_PLAYING)
         update(frametime);
     else if (state == STATE_LOST) {

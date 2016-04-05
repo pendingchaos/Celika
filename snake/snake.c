@@ -1,5 +1,6 @@
-#include "game.h"
-#include "draw.h"
+#include "celika/game.h"
+#include "celika/draw.h"
+#include "celika/list.h"
 
 #include <SDL2/SDL_keyboard.h>
 #include <SDL2/SDL_timer.h>
@@ -21,8 +22,6 @@ typedef enum state_t {
 
 typedef struct snake_bit_t {
     int x, y;
-    struct snake_bit_t* next;
-    struct snake_bit_t* prev;
 } snake_bit_t;
 
 typedef struct yumyum_t {
@@ -30,7 +29,7 @@ typedef struct yumyum_t {
 } yumyum_t;
 
 static state_t state = STATE_PAUSED;
-static snake_bit_t* head = NULL;
+static list_t* bits; //list_t of snake_bit_t
 static yumyum_t yumyums[NUM_YUMYUMS];
 static Uint64 last_move;
 static Uint64 move_interval;
@@ -39,14 +38,14 @@ static int dir[2];
 static SDL_Scancode dir_key;
 
 static void draw_snake() {
-    snake_bit_t* cur = head->next;
-    while (cur) {
-        float pos[] = {TILE_SIZE*(int)cur->x, TILE_SIZE*(int)cur->y};
+    for (size_t i = 1; i < list_len(bits); i++) {
+        snake_bit_t* bit = list_nth(bits, i);
+        float pos[] = {TILE_SIZE*(int)bit->x, TILE_SIZE*(int)bit->y};
         float size[] = {TILE_SIZE, TILE_SIZE};
         draw_add_rect(pos, size, draw_rgb(0.5, 1, 0.5));
-        cur = cur->next;
     }
     
+    snake_bit_t* head = list_nth(bits, 0);
     float pos[] = {TILE_SIZE*(int)head->x, TILE_SIZE*(int)head->y};
     float size[] = {TILE_SIZE, TILE_SIZE};
     draw_add_rect(pos, size, draw_rgb(0.2, 1, 0.2));
@@ -66,11 +65,10 @@ static bool used(int x, int y) {
         if (x==yumyums[i].x && y==yumyums[i].y)
             return true;
     
-    snake_bit_t* bit = head;
-    while (bit) {
+    for (size_t i = 0; i < list_len(bits); i++) {
+        snake_bit_t* bit = list_nth(bits, i);
         if (x==bit->x && y==bit->y)
             return true;
-        bit = bit->next;
     }
     
     return false;
@@ -124,13 +122,15 @@ static void update_snake(float frametime) {
     
     if (SDL_GetPerformanceCounter()-last_move > move_interval &&
         state==STATE_PLAYING) {
-        snake_bit_t* new_head = malloc(sizeof(snake_bit_t));
-        new_head->x = head->x + dir[0];
-        new_head->y = head->y + dir[1];
+        snake_bit_t* head = list_nth(bits, 0);
+        
+        snake_bit_t new_head;
+        new_head.x = head->x + dir[0];
+        new_head.y = head->y + dir[1];
         
         for (size_t i = 0; i < NUM_YUMYUMS; i++) {
-            int hx = new_head->x;
-            int hy = new_head->y;
+            int hx = new_head.x;
+            int hy = new_head.y;
             yumyum_t* yumyum = yumyums + i;
             if (yumyum->x==hx && yumyum->y==hy) {
                 place_yumyum(yumyum);
@@ -138,28 +138,14 @@ static void update_snake(float frametime) {
             }
         }
         
-        if (used(new_head->x, new_head->y)) state = STATE_LOST;
-        if (new_head->x < 0 || new_head->x>WIDTH-1) state = STATE_LOST;
-        if (new_head->y < 0 || new_head->y>HEIGHT-1) state = STATE_LOST;
+        if (used(new_head.x, new_head.y)) state = STATE_LOST;
+        if (new_head.x < 0 || new_head.x>WIDTH-1) state = STATE_LOST;
+        if (new_head.y < 0 || new_head.y>HEIGHT-1) state = STATE_LOST;
         
-        new_head->next = head;
-        new_head->prev = NULL;
-        head->prev = new_head;
-        head = new_head;
+        list_insert(bits, 0, &new_head);
         
-        size_t len = 0;
-        snake_bit_t* cur = head;
-        while (cur->next) {
-            cur = cur->next;
-            len++;
-        }
-        
-        if (len > points) {
-            snake_bit_t* cur = head;
-            while (cur->next) cur = cur->next;
-            cur->prev->next = NULL;
-            free(cur);
-        }
+        if (list_len(bits)-1 > points)
+            list_remove(list_nth(bits, list_len(bits)-1));
         
         last_move = SDL_GetPerformanceCounter();
     }
@@ -169,9 +155,11 @@ static void setup_state() {
     points = 0;
     memset(dir, 0, sizeof(dir));
     
-    head = malloc(sizeof(snake_bit_t));
-    head->x = head->y = 0;
-    head->next = head->prev = NULL;
+    snake_bit_t head;
+    head.x = head.y = 0;
+    
+    bits = list_new(sizeof(snake_bit_t), NULL);
+    list_append(bits, &head);
     
     for (size_t i = 0; i < NUM_YUMYUMS; i++) {
         yumyums[i].x = -1;
@@ -189,15 +177,10 @@ static void setup_state() {
 }
 
 static void free_state() {
-    snake_bit_t* cur = head;
-    while (cur) {
-        snake_bit_t* bit = cur;
-        cur = cur->next;
-        free(bit);
-    }
+    list_free(bits);
 }
 
-void snake_game_init(int* w, int* h) {
+void game_init(int* w, int* h) {
     *w = *h = 500;
     
     srand(time(NULL));
@@ -205,11 +188,11 @@ void snake_game_init(int* w, int* h) {
     setup_state();
 }
 
-void snake_game_deinit() {
+void game_deinit() {
     free_state();
 }
 
-void snake_game_frame(size_t w, size_t h, float frametime) {
+void game_frame(size_t w, size_t h, float frametime) {
     draw_add_aabb(create_aabb_lbwh(0, 0, w, h), draw_rgb(0.5, 0.5, 1));
     
     update_snake(frametime);

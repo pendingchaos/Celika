@@ -35,18 +35,26 @@ void list_free(list_t* list) {
 }
 
 void list_append(list_t* list, void* val) {
+    list_insert(list, list_len(list), val);
+}
+
+void list_insert(list_t* list, size_t before, void* val) {
     list_head_t* new = malloc(sizeof(list_head_t)+list->val_size);
     new->list = list;
-    new->next = NULL;
     memcpy(new+1, val, list->val_size);
     
-    if (list->first) {
-        list_head_t* last;
-        for (last = list->first; last->next; last = last->next);
-        new->prev = last;
-        last->next = new;
-    } else {
+    if (!before && list->first) { //insert beginning
         new->prev = NULL;
+        new->next = list->first;
+        list->first->prev = new;
+        list->first = new;
+    } else if (list->first) { //normal insert
+        list_head_t* after = list_nth(list, before-1);
+        new->prev = after;
+        new->next = after->next;
+        after->next = new;
+    } else if (!before) { //insert into empty list
+        new->prev = new->next = NULL;
         list->first = new;
     }
 }

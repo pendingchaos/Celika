@@ -22,7 +22,7 @@ static void quit() {
 int main() {
     SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER);
     
-    win = SDL_CreateWindow(PROJNAME,
+    win = SDL_CreateWindow("Celika",
                            SDL_WINDOWPOS_UNDEFINED,
                            SDL_WINDOWPOS_UNDEFINED,
                            500,
@@ -74,7 +74,7 @@ int main() {
         
         char title[256];
         static const char* fmt = "%s - %.0f mspf";
-        snprintf(title, sizeof(title), fmt, PROJNAME, frametime*1000);
+        snprintf(title, sizeof(title), fmt, "Celika", frametime*1000);
         
         SDL_SetWindowTitle(win, title);
     }
