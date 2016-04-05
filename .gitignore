@@ -1,3 +1,5 @@
 *.o
 *.d
-unnamedgame
+*.a
+shooty_thing/shooty_thing
+snake/snake
