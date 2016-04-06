@@ -28,7 +28,12 @@ long_line_behaviour=1
 long_line_column=72
 
 [files]
-current_page=-1
+current_page=2
+FILE_NAME_0=64;C;0;EUTF-8;0;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fcelika%2Finc%2Fcelika%2Faudio.h;0;4
+FILE_NAME_1=98;Make;0;EUTF-8;1;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fcelika%2FMakefile;0;4
+FILE_NAME_2=2008;C;0;EUTF-8;0;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fcelika%2Fsrc%2Faudio.c;0;4
+FILE_NAME_3=9538;C;0;EUTF-8;0;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fshooty_thing%2Fsrc%2Fshooty_thing.c;0;4
+FILE_NAME_4=4925;C;0;EUTF-8;0;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fsnake%2Fsnake.c;0;4
 
 [VTE]
 last_dir=/home/rugrats

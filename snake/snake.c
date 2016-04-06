@@ -178,11 +178,7 @@ static void free_state() {
     list_free(bits);
 }
 
-static sound_t* sound;
 void celika_game_init(int* w, int* h) {
-    sound = audio_create_sound("SpaceShooterRedux/Bonus/sfx_laser2.ogg");
-    audio_play_sound(sound, 1);
-    
     *w = *h = 500;
     
     srand(time(NULL));
@@ -191,8 +187,6 @@ void celika_game_init(int* w, int* h) {
 }
 
 void celika_game_deinit() {
-    audio_del_sound(sound);
-    
     free_state();
 }
 
