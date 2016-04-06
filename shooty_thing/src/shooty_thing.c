@@ -33,9 +33,11 @@
 #define PLAYER_PROJ_AMMO_USAGE 0.01
 
 #define ENEMY_SPEED 200
-#define ENEMY_FIRE_INTERVAL 0.5
+#define ENEMY_FIRE_INTERVAL 0.8
 #define ENEMY_HIT_DAMAGE 0.05
-#define ENEMY_FIRE_DIST_THRESHOLD 30
+#define ENEMY_FIRE_DIST_THRESHOLD 20
+#define ENEMY_FADE_RATE 10
+#define MAX_ENEMIES 15
 
 #define ENEMY_PROJ_SPEED 400
 #define ENEMY_PROJ_HIT_DAMAGE 0.025
@@ -45,10 +47,12 @@
 #define AMMO_PACK_CHANCE 0.3
 #define AMMO_PACK_SPEED 100
 #define AMMO_PACK_INC 0.25
+#define AMMO_PACK_FADE_RATE 10
 
 #define HP_PACK_CHANCE 0.2
 #define HP_PACK_SPEED 100
 #define HP_PACK_INC 0.1
+#define HP_PACK_FADE_RATE 10
 
 typedef enum state_t {
     STATE_PLAYING,
@@ -59,7 +63,15 @@ typedef struct enemy_t {
     aabb_t aabb;
     float velx;
     float fire_timeout;
+    bool destroyed;
+    float alpha;
 } enemy_t;
+
+typedef struct pack_t {
+    aabb_t aabb;
+    bool taken;
+    float alpha;
+} pack_t;
 
 static draw_tex_t* background_tex[6];
 static draw_tex_t* player_tex;
@@ -84,8 +96,8 @@ static size_t player_miss;
 static list_t* player_proj; //list of aabb_t
 static list_t* enemy_proj; //list of aabb_t
 static list_t* enemies; //list of enemy_t
-static list_t* ammo_packs; //list of aabb_t
-static list_t* hp_packs; //list of aabb_t
+static list_t* ammo_packs; //list of pack_t
+static list_t* hp_packs; //list of pack_t
 
 static float req_enemy_count;
 
@@ -120,6 +132,8 @@ static void init_enemy(enemy_t* enemy) {
     enemy->velx = cx<WINDOW_WIDTH/2 ? 1 : -1;
     enemy->velx *= rand()%25 + 25;
     enemy->fire_timeout = 0;
+    enemy->destroyed = false;
+    enemy->alpha = 1;
 }
 
 static void create_enemy() {
@@ -129,17 +143,23 @@ static void create_enemy() {
 }
 
 static void create_ammo_pack() {
-    aabb_t aabb = draw_get_tex_aabb(ammo_pack_tex);
-    aabb.left = rand()%WINDOW_WIDTH - aabb.width/2;
-    aabb.bottom = WINDOW_HEIGHT;
-    list_append(ammo_packs, &aabb);
+    pack_t pack;
+    pack.aabb = draw_get_tex_aabb(ammo_pack_tex);
+    pack.aabb.left = rand()%WINDOW_WIDTH - pack.aabb.width/2;
+    pack.aabb.bottom = WINDOW_HEIGHT;
+    pack.taken = false;
+    pack.alpha = 1;
+    list_append(ammo_packs, &pack);
 }
 
 static void create_hp_pack() {
-    aabb_t aabb = draw_get_tex_aabb(hp_pack_tex);
-    aabb.left = rand()%WINDOW_WIDTH - aabb.width/2;
-    aabb.bottom = WINDOW_HEIGHT;
-    list_append(hp_packs, &aabb);
+    pack_t pack;
+    pack.aabb = draw_get_tex_aabb(hp_pack_tex);
+    pack.aabb.left = rand()%WINDOW_WIDTH - pack.aabb.width/2;
+    pack.aabb.bottom = WINDOW_HEIGHT;
+    pack.taken = false;
+    pack.alpha = 1;
+    list_append(hp_packs, &pack);
 }
 
 static void update_player(float frametime) {
@@ -187,7 +207,7 @@ static void update_proj(float frametime) {
 }
 
 static void update_enemies(float frametime) {
-    for (size_t i = 0; i < list_len(enemies); i++) {
+    for (ptrdiff_t i = 0; i < list_len(enemies); i++) {
         enemy_t* enemy = list_nth(enemies, i);
         
         enemy->aabb.bottom -= frametime * ENEMY_SPEED;
@@ -195,8 +215,17 @@ static void update_enemies(float frametime) {
         if (aabb_top(enemy->aabb) < 0)
             init_enemy(enemy);
         
+        if (enemy->destroyed) {
+            enemy->alpha -= ENEMY_FADE_RATE * frametime;
+            if (enemy->alpha <= 0) {
+                list_remove(enemy);
+                i--;
+            }
+            continue;
+        }
+        
         if (intersect_aabb(enemy->aabb, player_aabb)) {
-            init_enemy(enemy);
+            enemy->destroyed = true;
             player_hp -= ENEMY_HIT_DAMAGE;
         }
         
@@ -214,7 +243,7 @@ static void update_enemies(float frametime) {
             if (intersect_aabb(enemy->aabb, *proj)) {
                 list_remove(proj);
                 j--;
-                init_enemy(enemy);
+                enemy->destroyed = true;
                 player_hit++;
             }
         }
@@ -223,35 +252,51 @@ static void update_enemies(float frametime) {
 
 static void update_packs(float frametime) {
     for (ptrdiff_t i = 0; i < list_len(ammo_packs); i++) {
-        aabb_t* ammo_pack = list_nth(ammo_packs, i);
+        pack_t* ammo_pack = list_nth(ammo_packs, i);
         
-        ammo_pack->bottom -= frametime * AMMO_PACK_SPEED;
-        if (aabb_top(*ammo_pack) < 0) {
+        ammo_pack->aabb.bottom -= frametime * AMMO_PACK_SPEED;
+        if (aabb_top(ammo_pack->aabb) < 0) {
             list_remove(ammo_pack);
             i--;
             continue;
         }
         
-        if (intersect_aabb(*ammo_pack, player_aabb)) {
-            list_remove(ammo_pack);
-            i--;
+        if (ammo_pack->taken) {
+            ammo_pack->alpha -= AMMO_PACK_FADE_RATE * frametime;
+            if (ammo_pack->alpha <= 0) {
+                list_remove(ammo_pack);
+                i--;
+            }
+            continue;
+        }
+        
+        if (intersect_aabb(ammo_pack->aabb, player_aabb)) {
+            ammo_pack->taken = true;
             player_ammo += AMMO_PACK_INC;
         }
     }
     
     for (size_t i = 0; i < list_len(hp_packs); i++) {
-        aabb_t* hp_pack = list_nth(hp_packs, i);
+        pack_t* hp_pack = list_nth(hp_packs, i);
         
-        hp_pack->bottom -= frametime * HP_PACK_SPEED;
-        if (aabb_top(*hp_pack) < 0) {
+        hp_pack->aabb.bottom -= frametime * HP_PACK_SPEED;
+        if (aabb_top(hp_pack->aabb) < 0) {
             list_remove(hp_pack);
             i--;
             continue;
         }
         
-        if (intersect_aabb(*hp_pack, player_aabb)) {
-            list_remove(hp_pack);
-            i--;
+        if (hp_pack->taken) {
+            hp_pack->alpha -= HP_PACK_FADE_RATE * frametime;
+            if (hp_pack->alpha <= 0) {
+                list_remove(hp_pack);
+                i--;
+            }
+            continue;
+        }
+        
+        if (intersect_aabb(hp_pack->aabb, player_aabb)) {
+            hp_pack->taken = true;
             player_hp += HP_PACK_INC;
         }
     }
@@ -264,8 +309,14 @@ static void update(float frametime) {
     update_packs(frametime);
     
     req_enemy_count += frametime * ENEMY_COUNT_UPDATE_RATE;
+    if ((int)req_enemy_count > MAX_ENEMIES)
+        req_enemy_count = MAX_ENEMIES;
     
-    for (size_t i = 0; i < ((int)req_enemy_count)-list_len(enemies); i++)
+    int enemy_count = 0;
+    for (size_t i = 0; i < list_len(enemies); i++)
+        enemy_count += ((enemy_t*)list_nth(enemies, i))->destroyed ? 0 : 1;
+    
+    for (size_t i = 0; i < ((int)req_enemy_count)-enemy_count; i++)
         create_enemy();
     
     if (rand()/(double)RAND_MAX > (1.0-AMMO_PACK_CHANCE*frametime))
@@ -291,8 +342,8 @@ static void setup_state() {
     player_proj = list_new(sizeof(aabb_t), NULL);
     enemy_proj = list_new(sizeof(aabb_t), NULL);
     enemies = list_new(sizeof(enemy_t), NULL);
-    ammo_packs = list_new(sizeof(aabb_t), NULL);
-    hp_packs = list_new(sizeof(aabb_t), NULL);
+    ammo_packs = list_new(sizeof(pack_t), NULL);
+    hp_packs = list_new(sizeof(pack_t), NULL);
     
     state = STATE_PLAYING;
 }
@@ -398,18 +449,24 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
     draw_set_tex(NULL);
     
     draw_set_tex(ammo_pack_tex);
-    for (size_t i = 0; i < list_len(ammo_packs); i++)
-        draw_add_aabb(*(aabb_t*)list_nth(ammo_packs, i), draw_rgb(1, 1, 1));
+    for (size_t i = 0; i < list_len(ammo_packs); i++) {
+        pack_t* pack = list_nth(ammo_packs, i);
+        draw_add_aabb(pack->aabb, draw_rgba(1, 1, 1, pack->alpha));
+    }
     draw_set_tex(NULL);
     
     draw_set_tex(hp_pack_tex);
-    for (size_t i = 0; i < list_len(hp_packs); i++)
-        draw_add_aabb(*(aabb_t*)list_nth(hp_packs, i), draw_rgb(1, 1, 1));
+    for (size_t i = 0; i < list_len(hp_packs); i++) {
+        pack_t* pack = list_nth(hp_packs, i);
+        draw_add_aabb(pack->aabb, draw_rgba(1, 1, 1, pack->alpha));
+    }
     draw_set_tex(NULL);
     
     draw_set_tex(enemy_tex);
-    for (size_t i = 0; i < list_len(enemies); i++)
-        draw_add_aabb(*(aabb_t*)list_nth(enemies, i), draw_rgb(1, 1, 1));
+    for (size_t i = 0; i < list_len(enemies); i++) {
+        enemy_t* enemy = list_nth(enemies, i);
+        draw_add_aabb(enemy->aabb, draw_rgba(1, 1, 1, enemy->alpha));
+    }
     draw_set_tex(NULL);
     
     {

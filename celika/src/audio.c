@@ -58,10 +58,10 @@ static void callback(void* userdata, Uint8* stream, int len) {
             data[j*2] += l;
             data[j*2+1] += r;
             
-            clipping = clipping || data[j*2] == 32768;
-            clipping = clipping || data[j*2] == -32767;
-            clipping = clipping || data[j*2+1] == 32768;
-            clipping = clipping || data[j*2+1] == -32767;
+            clipping = clipping || data[j*2] == 32767;
+            clipping = clipping || data[j*2] == -32768;
+            clipping = clipping || data[j*2+1] == 32767;
+            clipping = clipping || data[j*2+1] == -32768;
         }
         
         source->offset += sample_count;
