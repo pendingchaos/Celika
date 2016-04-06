@@ -21,6 +21,9 @@
 #define BG2_TEX "SpaceShooterRedux/Backgrounds/darkPurple.png"
 #define BG3_TEX "SpaceShooterRedux/Backgrounds/purple.png"
 
+#define LASER0_SOUND "SpaceShooterRedux/Bonus/sfx_laser1.ogg"
+#define LASER1_SOUND "SpaceShooterRedux/Bonus/sfx_laser2.ogg"
+
 #define BACKGROUND_SCROLL_SPEED 128
 #define BACKGROUND_CHANGE_SPEED 0.1
 
@@ -86,12 +89,16 @@ static list_t* hp_packs; //list of aabb_t
 
 static float req_enemy_count;
 
+static sound_t* laser_sounds[2];
+
 static void create_player_proj() {
     aabb_t aabb = draw_get_tex_aabb(player_proj_tex);
     aabb.left = player_aabb.left + player_aabb.width/2;
     aabb.left -= aabb.width/2;
     aabb.bottom = player_aabb.bottom + player_aabb.height;
     list_append(player_proj, &aabb);
+    
+    audio_play_sound(laser_sounds[rand()%2], 0.1, 0, true);
 }
 
 static void create_enemy_proj(size_t i) {
@@ -101,6 +108,8 @@ static void create_enemy_proj(size_t i) {
     aabb.left -= aabb.width/2;
     aabb.bottom = enemy->aabb.bottom - aabb.height;
     list_append(enemy_proj, &aabb);
+    
+    audio_play_sound(laser_sounds[rand()%2], 0.1, 0, true);
 }
 
 static void init_enemy(enemy_t* enemy) {
@@ -318,11 +327,17 @@ void celika_game_init(int* w, int* h) {
     
     passthough_effect = draw_create_effect("shaders/passthough.glsl");
     
+    laser_sounds[0] = audio_create_sound(LASER0_SOUND);
+    laser_sounds[1] = audio_create_sound(LASER1_SOUND);
+    
     setup_state();
 }
 
 void celika_game_deinit() {
     cleanup_state();
+    
+    audio_del_sound(laser_sounds[0]);
+    audio_del_sound(laser_sounds[1]);
     
     draw_del_effect(passthough_effect);
     

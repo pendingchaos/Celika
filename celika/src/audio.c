@@ -52,31 +52,16 @@ static void callback(void* userdata, Uint8* stream, int len) {
                 end = true;
                 break;
             }
-            int32_t l = sound->samples[index*2] * source->volume;
-            int32_t r = sound->samples[index*2+1] * source->volume;
+            int16_t l = sound->samples[index*2] * source->volume;
+            int16_t r = sound->samples[index*2+1] * source->volume;
             
-            if (l > 32768) {
-                l = 32768;
-                clipping = true;
-            }
+            data[j*2] += l;
+            data[j*2+1] += r;
             
-            if (l < -32767) {
-                l = -32767;
-                clipping = true;
-            }
-            
-            if (r > 32768) {
-                r = 32768;
-                clipping = true;
-            }
-            
-            if (r < -32767) {
-                r = -32767;
-                clipping = true;
-            }
-            
-            data[j*2] = l;
-            data[j*2+1] = r;
+            clipping = clipping || data[j*2] == 32768;
+            clipping = clipping || data[j*2] == -32767;
+            clipping = clipping || data[j*2+1] == 32768;
+            clipping = clipping || data[j*2+1] == -32767;
         }
         
         source->offset += sample_count;
