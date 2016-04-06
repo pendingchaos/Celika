@@ -20,7 +20,11 @@ typedef struct effect_param_t {
     char name[64];
     bool is_tex;
     union {
-        GLuint tex;
+        struct {
+            GLuint id;
+            size_t w;
+            size_t h;
+        } tex;
         float fval;
     };
 } effect_param_t;
@@ -33,6 +37,7 @@ struct draw_effect_t {
 struct draw_fb_t {
     GLuint fb;
     GLuint tex;
+    size_t w, h;
 };
 
 typedef struct batch_t {
@@ -59,8 +64,68 @@ static float scale_x = 1;
 static float scale_y = 1;
 static float scale_origin_x = 0;
 static float scale_origin_y = 0;
+static GLuint pos_buf;
+static GLuint col_buf;
+static GLuint uv_buf;
+static GLuint batch_program;
+static GLuint batch_program_tex;
+
+static GLuint create_program(const char* name, const char* vsource, const char* fsource) {
+    const char* vsources[] = {
+#ifdef __EMSCRIPTEN__
+"precision highp float;\n"
+#else
+"#version 100\n"
+#endif
+"#line 1\n", vsource};
+    
+    const char* fsources[] = {
+#ifdef __EMSCRIPTEN__
+"#version 100\n"
+"precision highp float;\n"
+#else
+"#version 120\n"
+#endif
+"#define GET_TEXEL(tex, tex_dim, coord) texture2D(tex, (coord)/vec2(tex_dim))\n"
+"#line 1\n", fsource};
+    
+    GLuint vert = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vert, 2, (const GLchar**)vsources, NULL);
+    glCompileShader(vert);
+    char log[1024];
+    glGetShaderInfoLog(vert, sizeof(log), NULL, log);
+    printf("%s vertex compile info log: %s\n", name, log);
+    
+    GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(frag, 2, (const GLchar**)fsources, NULL);
+    glCompileShader(frag);
+    memset(log, 0, sizeof(log));
+    glGetShaderInfoLog(frag, sizeof(log), NULL, log);
+    printf("%s fragment compile info log: %s\n", name, log);
+    
+    GLuint program = glCreateProgram();
+    glAttachShader(program, vert);
+    glAttachShader(program, frag);
+    glLinkProgram(program);
+    glDeleteShader(vert);
+    glDeleteShader(frag);
+    memset(log, 0, sizeof(log));
+    glGetProgramInfoLog(program, sizeof(log), NULL, log);
+    printf("%s link info log: %s\n", name, log);
+    
+    glValidateProgram(program);
+    memset(log, 0, sizeof(log));
+    glGetProgramInfoLog(program, sizeof(log), NULL, log);
+    printf("%s validate info log: %s\n", name, log);
+    
+    return program;
+}
 
 void draw_init() {
+    glGenBuffers(1, &pos_buf);
+    glGenBuffers(1, &col_buf);
+    glGenBuffers(1, &uv_buf);
+    
     glEnable(GL_BLEND);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     
@@ -68,7 +133,7 @@ void draw_init() {
     glGenTextures(1, &font_tex_id);
     glBindTexture(GL_TEXTURE_2D, font_tex_id);
     
-    uint8_t data[BUILTIN_FONT_WIDTH*BUILTIN_FONT_HEIGHT*128];
+    uint8_t data[BUILTIN_FONT_WIDTH*BUILTIN_FONT_HEIGHT*128*4];
     
     for (size_t i = 0; i < 128; i++) {
         for (size_t x = 0; x < BUILTIN_FONT_WIDTH; x++) {
@@ -76,14 +141,15 @@ void draw_init() {
                 size_t index = y*BUILTIN_FONT_WIDTH*128 +
                                x+i*BUILTIN_FONT_WIDTH;
                 bool opaque = get_builtin_font_at(i, x, BUILTIN_FONT_HEIGHT-y-1);
-                data[index] = opaque ? 255 : 0;
+                data[index*4+0] = data[index*4+1] = data[index*4+2] = 255;
+                data[index*4+3] = opaque ? 255 : 0;
             }
         }
     }
     
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA8, BUILTIN_FONT_WIDTH*128,
-                 BUILTIN_FONT_HEIGHT, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, BUILTIN_FONT_WIDTH*128,
+                 BUILTIN_FONT_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -99,9 +165,42 @@ void draw_init() {
     printf("OpenGL vendor: %s\n", glGetString(GL_VENDOR));
     printf("OpenGL renderer: %s\n", glGetString(GL_RENDERER));
     printf("GLSL version: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+    
+    const char* vsource =
+    "attribute vec2 aPos;\n"
+    "attribute vec4 aCol;\n"
+    "attribute vec2 aUv;\n"
+    "varying vec2 vfUv;\n"
+    "varying vec4 vfCol;\n"
+    "void main() {\n"
+    "    gl_Position = vec4(aPos, 0, 1);\n"
+    "    vfUv = aUv;\n"
+    "    vfCol = aCol;\n"
+    "}\n";
+    
+    const char* fsource =
+    "varying vec2 vfUv;\n"
+    "varying vec4 vfCol;\n"
+    "void main() {\n"
+    "    gl_FragColor = vfCol;\n"
+    "}\n";
+    
+    const char* fsource_tex =
+    "varying vec2 vfUv;\n"
+    "varying vec4 vfCol;\n"
+    "uniform sampler2D uTex;\n"
+    "void main() {\n"
+    "    gl_FragColor = vfCol * texture2D(uTex, vfUv);\n"
+    "}\n";
+    
+    batch_program = create_program("batch program untextured", vsource, fsource);
+    batch_program_tex = create_program("batch program textured", vsource, fsource_tex);
 }
 
 void draw_deinit() {
+    glDeleteProgram(batch_program);
+    glDeleteProgram(batch_program_tex);
+    
     for (size_t i = 0; i < list_len(batches); i++) {
         batch_t* batch = list_nth(batches, i);
         free(batch->pos);
@@ -116,6 +215,10 @@ void draw_deinit() {
     
     glDeleteTextures(1, &builtin_font_tex->id);
     free(builtin_font_tex);
+    
+    glDeleteBuffers(1, &uv_buf);
+    glDeleteBuffers(1, &col_buf);
+    glDeleteBuffers(1, &pos_buf);
 }
 
 draw_tex_t* draw_create_tex(const char* filename, int* w, int* h) {
@@ -138,23 +241,25 @@ draw_tex_t* draw_create_tex(const char* filename, int* w, int* h) {
     GLuint tex;
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    #ifdef __EMSCRIPTEN__
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    #else
+    glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    #endif
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     
     stbi_image_free(data);
     
-    if (w || h) {
-        if (w)
-            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, w);
-        if (h)
-            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, h);
-    }
+    if (w) *w = width;
+    if (h) *h = height;
     
     draw_tex_t* res = malloc(sizeof(draw_tex_t));
     res->id = tex;
@@ -213,40 +318,24 @@ draw_effect_t* draw_create_effect(const char* shdr_fname) {
     int size = ftell(file);
     fseek(file, 0, SEEK_SET);
     
-    char* source = malloc(size+1);
-    source[size] = 0;
-    fread(source, size, 1, file);
+    char* fsource = malloc(size+1);
+    fsource[size] = 0;
+    fread(fsource, size, 1, file);
     
     fclose(file);
     
-    char* sources[] = {
-"#version 120\n"
-"#define GET_TEXEL(tex, coord) texture2D(tex, (coord)/vec2(tex##_dim))\n"
-"#line 1\n", source};
-    
-    GLuint shdr = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(shdr, 2, (const GLchar**)sources, NULL);
-    free(source);
-    glCompileShader(shdr);
-    char log[1024];
-    glGetShaderInfoLog(shdr, sizeof(log), NULL, log);
-    printf("%s compile info log: %s\n", shdr_fname, log);
-    
-    GLuint program = glCreateProgram();
-    glAttachShader(program, shdr);
-    glLinkProgram(program);
-    glDeleteShader(shdr);
-    memset(log, 0, sizeof(log));
-    glGetProgramInfoLog(shdr, sizeof(log), NULL, log);
-    printf("%s link info log: %s\n", shdr_fname, log);
-    
-    glValidateProgram(program);
-    memset(log, 0, sizeof(log));
-    glGetProgramInfoLog(shdr, sizeof(log), NULL, log);
-    printf("%s validate info log: %s\n", shdr_fname, log);
+    static const char* vsource =
+    "attribute vec2 aPos;\n"
+    "varying vec2 vfUv;\n"
+    "void main() {\n"
+    "    gl_Position = vec4(aPos, 0, 1);\n"
+    "    vfUv = aPos*0.5+0.5;\n"
+    "}\n";
     
     draw_effect_t* effect = malloc(sizeof(draw_effect_t));
-    effect->program = program;
+    effect->program = create_program(shdr_fname, vsource, fsource);
+    
+    free(fsource);
     
     effect->params = list_new(sizeof(effect_param_t), NULL);
     
@@ -367,12 +456,19 @@ void draw_add_aabb(aabb_t aabb, draw_col_t col) {
 
 static draw_fb_t* create_fb() {
     draw_fb_t* res = malloc(sizeof(draw_fb_t));
+    res->w = width;
+    res->h = height;
     
     glGenTextures(1, &res->tex);
     glBindTexture(GL_TEXTURE_2D, res->tex);
     
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0,
-                 GL_RGBA, GL_FLOAT, NULL);
+    #ifdef __EMSCRIPTEN__
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    #else
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, width, height, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    #endif
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -391,33 +487,45 @@ static draw_fb_t* create_fb() {
 static void draw_batch(batch_t batch) {
     if (!batch.vert_count) return;
     
+    GLint program = batch.tex ? batch_program_tex : batch_program;
+    glUseProgram(program);
+    
     if (batch.tex) {
-        glEnable(GL_TEXTURE_2D);
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, batch.tex->id);
+        glUniform1i(glGetUniformLocation(program, "uTex"), 0);
     }
     
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glEnableClientState(GL_COLOR_ARRAY);
-    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-    glVertexPointer(2, GL_FLOAT, 0, batch.pos);
-    glColorPointer(4, GL_FLOAT, 0, batch.col);
-    glTexCoordPointer(2, GL_FLOAT, 0, batch.uv);
+    for (size_t i = 0; i < batch.vert_count; i++) {
+        batch.pos[i*2+0] = batch.pos[i*2+0]/width*2 - 1;
+        batch.pos[i*2+1] = batch.pos[i*2+1]/height*2 - 1;
+    }
     
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-    glTranslatef(-1, -1, 0);
-    glScalef(1.0/width*2, 1.0/height*2, 1);
+    GLint pos_loc = glGetAttribLocation(program, "aPos");
+    GLint col_loc = glGetAttribLocation(program, "aCol");
+    GLint uv_loc = glGetAttribLocation(program, "aUv");
+    
+    glEnableVertexAttribArray(pos_loc);
+    glEnableVertexAttribArray(col_loc);
+    if (batch.tex) glEnableVertexAttribArray(uv_loc);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, pos_buf);
+    glBufferData(GL_ARRAY_BUFFER, batch.vert_count*8, batch.pos, GL_STREAM_DRAW);
+    glVertexAttribPointer(pos_loc, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, col_buf);
+    glBufferData(GL_ARRAY_BUFFER, batch.vert_count*16, batch.col, GL_STREAM_DRAW);
+    glVertexAttribPointer(col_loc, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    
+    if (batch.tex) {
+        glBindBuffer(GL_ARRAY_BUFFER, uv_buf);
+        glBufferData(GL_ARRAY_BUFFER, batch.vert_count*8, batch.uv, GL_STREAM_DRAW);
+        glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    }
+    
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     glDrawArrays(GL_TRIANGLES, 0, batch.vert_count);
-    
-    glPopMatrix();
-    
-    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-    glDisableClientState(GL_COLOR_ARRAY);
-    glDisableClientState(GL_VERTEX_ARRAY);
-    
-    if (batch.tex) glDisable(GL_TEXTURE_2D);
     
     free(batch.pos);
     free(batch.col);
@@ -447,11 +555,11 @@ void draw_prims() {
 
 draw_fb_t* draw_prims_fb() {
     draw_fb_t* res = create_fb();
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res->fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, res->fb);
     
     draw_prims();
     
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return res;
 }
 
@@ -479,18 +587,16 @@ void draw_effect_param_float(draw_effect_t* effect, const char* name, float val)
 void draw_effect_param_fb(draw_effect_t* effect, const char* name, draw_fb_t* val) {
     effect_param_t param;
     param.is_tex = true;
-    param.tex = val->tex;
+    param.tex.id = val->tex;
+    param.tex.w = val->w;
+    param.tex.h = val->h;
     effect_param(effect, name, param);
 }
 
 void draw_do_effect(draw_effect_t* effect) {
-    static float pos[] = {-1, -1, 1, -1, 1, 1, -1, 1};
-    static float uv[] = {0, 0, 1, 0, 1, 1, 0, 1};
-    
     glUseProgram(effect->program);
     
-    size_t next_unit = 1;
-    
+    size_t next_unit = 0;
     for (size_t i = 0; i < list_len(effect->params); i++) {
         effect_param_t* param = list_nth(effect->params, i);
         GLint loc = glGetUniformLocation(effect->program, param->name);
@@ -501,7 +607,7 @@ void draw_do_effect(draw_effect_t* effect) {
         
         if (param->is_tex) {
             glActiveTexture(GL_TEXTURE0+next_unit);
-            glBindTexture(GL_TEXTURE_2D, param->tex);
+            glBindTexture(GL_TEXTURE_2D, param->tex.id);
             glUniform1i(loc, next_unit);
             next_unit++;
             
@@ -509,39 +615,39 @@ void draw_do_effect(draw_effect_t* effect) {
             snprintf(name, sizeof(name), "%s_dim", param->name);
             
             GLint dim_loc = glGetUniformLocation(effect->program, name);
-            if (dim_loc >= 0) {
-                GLint w, h;
-                glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
-                glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
-                glUniform2f(dim_loc, w, h);
-            }
+            if (dim_loc >= 0)
+                glUniform2f(dim_loc, param->tex.w, param->tex.h);
         } else {
             glUniform1f(loc, param->fval);
         }
     }
     
-    glActiveTexture(GL_TEXTURE0);
+    GLint pos_loc = glGetAttribLocation(effect->program, "aPos");
     
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-    glVertexPointer(2, GL_FLOAT, 0, pos);
-    glTexCoordPointer(2, GL_FLOAT, 0, uv);
+    glBindBuffer(GL_ARRAY_BUFFER, pos_buf);
+    static float pos[] = {-1, -1,
+                           1, -1,
+                           1,  1,
+                           
+                          -1, -1,
+                          -1,  1,
+                           1,  1};
+    glBufferData(GL_ARRAY_BUFFER, sizeof(pos), pos, GL_STREAM_DRAW);
+    glEnableVertexAttribArray(pos_loc);
+    glVertexAttribPointer(pos_loc, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
     
-    glDrawArrays(GL_QUADS, 0, 4);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     
-    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-    glDisableClientState(GL_VERTEX_ARRAY);
-    
-    glUseProgram(0);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
 draw_fb_t* draw_do_effect_fb(draw_effect_t* effect) {
     draw_fb_t* res = create_fb();
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res->fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, res->fb);
     
     draw_do_effect(effect);
     
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return res;
 }
 

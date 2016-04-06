@@ -23,6 +23,7 @@
 
 #define LASER0_SOUND "SpaceShooterRedux/Bonus/sfx_laser1.ogg"
 #define LASER1_SOUND "SpaceShooterRedux/Bonus/sfx_laser2.ogg"
+#define LOSE_SOUND "SpaceShooterRedux/Bonus/sfx_lose.ogg"
 
 #define BACKGROUND_SCROLL_SPEED 128
 #define BACKGROUND_CHANGE_SPEED 0.1
@@ -102,6 +103,7 @@ static list_t* hp_packs; //list of pack_t
 static float req_enemy_count;
 
 static sound_t* laser_sounds[2];
+static sound_t* lose_sound;
 
 static void create_player_proj() {
     aabb_t aabb = draw_get_tex_aabb(player_proj_tex);
@@ -325,7 +327,10 @@ static void update(float frametime) {
     if (rand()/(double)RAND_MAX > (1.0-HP_PACK_CHANCE*frametime))
         create_hp_pack();
     
-    if (player_hp <= 0) state = STATE_LOST;
+    if (player_hp <= 0) {
+        state = STATE_LOST;
+        audio_play_sound(lose_sound, 1, 0, true);
+    }
     
     player_ammo = fmin(fmax(player_ammo, 0), 1);
     player_hp = fmin(fmax(player_hp, 0), 1);
@@ -380,6 +385,7 @@ void celika_game_init(int* w, int* h) {
     
     laser_sounds[0] = audio_create_sound(LASER0_SOUND);
     laser_sounds[1] = audio_create_sound(LASER1_SOUND);
+    lose_sound = audio_create_sound(LOSE_SOUND);
     
     setup_state();
 }
@@ -387,6 +393,7 @@ void celika_game_init(int* w, int* h) {
 void celika_game_deinit() {
     cleanup_state();
     
+    audio_del_sound(lose_sound);
     audio_del_sound(laser_sounds[0]);
     audio_del_sound(laser_sounds[1]);
     
@@ -411,6 +418,7 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
     }
     
     float time = background_scroll / (double)BACKGROUND_SCROLL_SPEED;
+    
     time *= BACKGROUND_CHANGE_SPEED;
     draw_tex_t* background_textures[] = {background_tex[(int)floor(time) % 6],
                                          background_tex[(int)ceil(time) % 6]};

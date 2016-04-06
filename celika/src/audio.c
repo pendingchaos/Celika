@@ -94,6 +94,10 @@ void audio_init(size_t freq, size_t sample_buf_size) {
         exit(EXIT_FAILURE);
     }
     
+    printf("%d %zu\n", spec.freq, freq);
+    printf("%d %d\n", spec.format, AUDIO_S16);
+    printf("%d %d\n", spec.channels, 2);
+    
     SDL_PauseAudioDevice(dev, 0);
 }
 
