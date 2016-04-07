@@ -1,6 +1,6 @@
 .PHONY: all
 ifdef EMSCRIPTEN
-all: shooty_thing.html
+all: index.js
 else
 all: shooty_thing
 endif
@@ -12,8 +12,8 @@ shooty_thing: $(CELIKA_DEPS)
 	@$(CC) shooty_thing.c $(CELIKA_LDFLAGS) -I$(CELIKA_DIR)inc -o shooty_thing -Os
 
 ifdef EMSCRIPTEN
-shooty_thing.html: $(CELIKA_DEPS)
-	@$(CC) shooty_thing.c $(CELIKA_LDFLAGS) -I$(CELIKA_DIR)inc -o shooty_thing.html -Oz \
+index.js: $(CELIKA_DEPS)
+	@$(CC) shooty_thing.c $(CELIKA_LDFLAGS) -I$(CELIKA_DIR)inc -o index.js -Oz \
 	       --embed-file SpaceShooterRedux/PNG/playerShip3_green.png \
 	       --embed-file SpaceShooterRedux/PNG/ufoRed.png \
 	       --embed-file SpaceShooterRedux/PNG/Lasers/laserGreen10.png \
@@ -34,8 +34,7 @@ endif
 .PHONY: clean
 clean:
 ifdef EMSCRIPTEN
-	@rm -f shooty_thing.html
-	@rm -f shooty_thing.js
+	@rm -f index.js
 else
 	@rm -f shooty_thing
 endif

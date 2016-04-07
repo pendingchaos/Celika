@@ -1,6 +1,6 @@
 .PHONY: all
 ifdef EMSCRIPTEN
-all: snake.html
+all: index.js
 else
 all: snake
 endif
@@ -9,8 +9,8 @@ CELIKA_DIR = ../celika/
 include $(CELIKA_DIR)Makefile
 
 ifdef EMSCRIPTEN
-snake.html: $(CELIKA_DEPS)
-	@$(CC) snake.c $(CELIKA_LDFLAGS) -I$(CELIKA_DIR)inc -o snake.html \
+index.js: $(CELIKA_DEPS)
+	@$(CC) snake.c $(CELIKA_LDFLAGS) -I$(CELIKA_DIR)inc -o index.js \
 	       --memory-init-file 0 -Oz
 else
 snake: $(CELIKA_DEPS)
@@ -20,8 +20,7 @@ endif
 .PHONY: clean
 clean:
 ifdef EMSCRIPTEN
-	@rm -f snake.html
-	@rm -f snake.js
+	@rm -f index.js
 else
 	@rm -f snake
 endif
