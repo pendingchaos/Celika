@@ -3,8 +3,9 @@ CELIKA_TARGET = release
 else
 CELIKA_TARGET ?= debug
 endif
-CELIKA_CFLAGS = -pedantic -Wall -std=c11 `pkg-config vorbisfile --cflags` \
-                -DGL_GLEXT_PROTOTYPES -I$(CELIKA_DIR)inc/celika -DCELIKA_TARGET=$(CELIKA_TARGET)
+CELIKA_CFLAGS = -I$(CELIKA_DIR)inc -DCELIKA_TARGET=$(CELIKA_TARGET)
+CELIKA_INTERNAL_CFLAGS = -pedantic -Wall -std=c11 `pkg-config vorbisfile --cflags` \
+                         -DGL_GLEXT_PROTOTYPES -I$(CELIKA_DIR)inc/celika -DCELIKA_TARGET=$(CELIKA_TARGET)
 ifdef EMSCRIPTEN
 CELIKA_LDFLAGS = -lGL -lm $(CELIKA_DIR)libcelika.emscripten.$(CELIKA_TARGET).a \
                  $(EMSCRIPTEN)/system/local/lib/libvorbisfile.a \
@@ -42,10 +43,10 @@ libcelika$(CELIKA_EM).$(CELIKA_TARGET).a: $(celika_obj)
 	@$(CPP) $(CELIKA_CFLAGS) $< -M -MT $(@:.d=.o) >$@
 
 .%.celika$(CELIKA_EM).debug.o: %.c Makefile
-	@$(CC) -c $(CELIKA_CFLAGS) $< -o $@ $(CELIKA_DBG_CFLAGS)
+	@$(CC) -c $(CELIKA_INTERNAL_CFLAGS) $< -o $@ $(CELIKA_DBG_CFLAGS)
 
 .%.celika$(CELIKA_EM).release.o: %.c Makefile
-	@$(CC) -c $(CELIKA_CFLAGS) $< -o $@ $(CELIKA_REL_CFLAGS)
+	@$(CC) -c $(CELIKA_INTERNAL_CFLAGS) $< -o $@ $(CELIKA_REL_CFLAGS)
 
 .PHONY: clean
 celika_clean:

@@ -3,3 +3,5 @@
 *.a
 shooty_thing/shooty_thing
 snake/snake
+shooty_thing/index.js
+snake/index.js
