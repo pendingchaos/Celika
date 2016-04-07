@@ -4,6 +4,9 @@
 #include "stb_image.h"
 
 #include <SDL2/SDL_opengl.h>
+#include <SDL2/SDL_video.h>
+#include <SDL2/SDL_assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,8 +32,13 @@ typedef struct effect_param_t {
     };
 } effect_param_t;
 
+typedef struct draw_program_t {
+    GLuint program_lin;
+    GLuint program_srgb;
+} draw_program_t;
+
 struct draw_effect_t {
-    GLuint program;
+    draw_program_t program;
     list_t* params; //list of effect_param_t
 };
 
@@ -48,6 +56,10 @@ typedef struct batch_t {
     float* uv;
 } batch_t;
 
+static bool srgb_textures;
+static bool lin_texture_read;
+static bool lin_texture_write;
+static bool lin_fb_write;
 static draw_tex_t* cur_tex = 0;
 static size_t vert_count = 0;
 static float* pos = NULL;
@@ -67,10 +79,10 @@ static float scale_origin_y = 0;
 static GLuint pos_buf;
 static GLuint col_buf;
 static GLuint uv_buf;
-static GLuint batch_program;
-static GLuint batch_program_tex;
+static draw_program_t batch_program;
+static draw_program_t batch_program_tex;
 
-static GLuint create_program(const char* name, const char* vsource, const char* fsource) {
+static GLuint _create_program(const char* name, const char* vsource, const char* fsource, bool output_srgb) {
     const char* vsources[] = {
 #ifdef __EMSCRIPTEN__
 "precision highp float;\n"
@@ -86,8 +98,25 @@ static GLuint create_program(const char* name, const char* vsource, const char* 
 #else
 "#version 120\n"
 #endif
-"#define GET_TEXEL(tex, tex_dim, coord) texture2D(tex, (coord)/vec2(tex_dim))\n"
-"#line 1\n", fsource};
+"vec4 to_srgb(vec4 c) {\n"
+"    vec3 s1 = sqrt(c.rgb);\n"
+"    vec3 s2 = sqrt(s1);\n"
+"    vec3 s3 = sqrt(s2);\n"
+"    return vec4(0.662002687*s1 + 0.684122060*s2 - 0.323583601*s3 - 0.0225411470*c.rgb, c.a);\n"
+"}\n"
+"vec4 to_lin(vec4 c) {\n"
+"    return vec4(c.rgb*(c.rgb*(c.rgb*0.305306011+0.682171111)+0.012522878), c.a);\n"
+"}\n",
+lin_texture_read ? "#define TEXTURE2D(tex, coord) texture2D(tex, coord)\n" :
+                   "#define TEXTURE2D(tex, coord) to_lin(texture2D(tex, coord))\n",
+lin_texture_read ? "#define TEXELFETCH(tex, tex_dim, coord) texture2D(tex, (coord)/vec2(tex_dim))\n" :
+                   "#define TEXELFETCH(tex, tex_dim, coord) to_lin(texture2D(tex, (coord)/vec2(tex_dim)))\n",
+"#line 1\n",
+fsource,
+"void main() {\n",
+output_srgb ? "    gl_FragColor = to_srgb(celika_main());\n" :
+              "    gl_FragColor = celika_main();\n",
+"}\n"};
     
     GLuint vert = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vert, 2, (const GLchar**)vsources, NULL);
@@ -97,7 +126,7 @@ static GLuint create_program(const char* name, const char* vsource, const char* 
     printf("%s vertex compile info log: %s\n", name, log);
     
     GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(frag, 2, (const GLchar**)fsources, NULL);
+    glShaderSource(frag, 8, (const GLchar**)fsources, NULL);
     glCompileShader(frag);
     memset(log, 0, sizeof(log));
     glGetShaderInfoLog(frag, sizeof(log), NULL, log);
@@ -121,7 +150,25 @@ static GLuint create_program(const char* name, const char* vsource, const char* 
     return program;
 }
 
+static draw_program_t create_program(const char* name, const char* vsource, const char* fsource) {
+    draw_program_t prog;
+    prog.program_lin = _create_program(name, vsource, fsource, false);
+    prog.program_srgb = _create_program(name, vsource, fsource, true);
+    return prog;
+}
+
 void draw_init() {
+    #ifdef __EMSCRIPTEN__
+    srgb_textures = lin_texture_read = lin_texture_write = lin_fb_write = false;
+    #else
+    lin_fb_write = SDL_GL_ExtensionSupported("GL_EXT_framebuffer_sRGB");
+    srgb_textures = lin_texture_read = lin_texture_write =
+    SDL_GL_ExtensionSupported("GL_EXT_texture_sRGB");
+    lin_texture_write = lin_fb_write && lin_texture_read;
+    SDL_assert_release(SDL_GL_ExtensionSupported("GL_ARB_framebuffer_object"));
+    if (lin_fb_write) glEnable(GL_FRAMEBUFFER_SRGB_EXT);
+    #endif
+    
     glGenBuffers(1, &pos_buf);
     glGenBuffers(1, &col_buf);
     glGenBuffers(1, &uv_buf);
@@ -181,25 +228,27 @@ void draw_init() {
     const char* fsource =
     "varying vec2 vfUv;\n"
     "varying vec4 vfCol;\n"
-    "void main() {\n"
-    "    gl_FragColor = vfCol;\n"
+    "vec4 celika_main() {\n"
+    "    return vfCol;\n"
     "}\n";
     
     const char* fsource_tex =
     "varying vec2 vfUv;\n"
     "varying vec4 vfCol;\n"
     "uniform sampler2D uTex;\n"
-    "void main() {\n"
-    "    gl_FragColor = vfCol * texture2D(uTex, vfUv);\n"
+    "vec4 celika_main() {\n"
+    "    return vfCol * TEXTURE2D(uTex, vfUv);\n"
     "}\n";
     
-    batch_program = create_program("batch program untextured", vsource, fsource);
-    batch_program_tex = create_program("batch program textured", vsource, fsource_tex);
+    batch_program = create_program("batch program", vsource, fsource);
+    batch_program_tex = create_program("textured batch program", vsource, fsource_tex);
 }
 
 void draw_deinit() {
-    glDeleteProgram(batch_program);
-    glDeleteProgram(batch_program_tex);
+    glDeleteProgram(batch_program.program_lin);
+    glDeleteProgram(batch_program.program_srgb);
+    glDeleteProgram(batch_program_tex.program_lin);
+    glDeleteProgram(batch_program_tex.program_srgb);
     
     for (size_t i = 0; i < list_len(batches); i++) {
         batch_t* batch = list_nth(batches, i);
@@ -243,13 +292,13 @@ draw_tex_t* draw_create_tex(const char* filename, int* w, int* h) {
     glBindTexture(GL_TEXTURE_2D, tex);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     #ifdef __EMSCRIPTEN__
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB_ALPHA : GL_RGBA,
+                 width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     #else
     glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB8_ALPHA8 : GL_RGBA8,
+                 width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     #endif
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -344,7 +393,8 @@ draw_effect_t* draw_create_effect(const char* shdr_fname) {
 
 void draw_del_effect(draw_effect_t* effect) {
     list_free(effect->params);
-    glDeleteProgram(effect->program);
+    glDeleteProgram(effect->program.program_lin);
+    glDeleteProgram(effect->program.program_srgb);
     free(effect);
 }
 
@@ -463,10 +513,10 @@ static draw_fb_t* create_fb() {
     glBindTexture(GL_TEXTURE_2D, res->tex);
     
     #ifdef __EMSCRIPTEN__
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
+    glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB_ALPHA : GL_RGBA, width, height, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     #else
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, width, height, 0,
+    glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB8_ALPHA8 : GL_RGBA8, width, height, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     #endif
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -484,10 +534,14 @@ static draw_fb_t* create_fb() {
     return res;
 }
 
+static bool framebuffer_bound = false;
+
 static void draw_batch(batch_t batch) {
     if (!batch.vert_count) return;
     
-    GLint program = batch.tex ? batch_program_tex : batch_program;
+    bool output_lin = framebuffer_bound ? lin_texture_write : lin_fb_write;
+    GLint program = output_lin ? (batch.tex ? batch_program_tex.program_lin : batch_program.program_lin)
+                               : (batch.tex ? batch_program_tex.program_srgb : batch_program.program_srgb);
     glUseProgram(program);
     
     if (batch.tex) {
@@ -556,10 +610,13 @@ void draw_prims() {
 draw_fb_t* draw_prims_fb() {
     draw_fb_t* res = create_fb();
     glBindFramebuffer(GL_FRAMEBUFFER, res->fb);
+    framebuffer_bound = true;
     
     draw_prims();
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    framebuffer_bound = false;
+    
     return res;
 }
 
@@ -594,12 +651,15 @@ void draw_effect_param_fb(draw_effect_t* effect, const char* name, draw_fb_t* va
 }
 
 void draw_do_effect(draw_effect_t* effect) {
-    glUseProgram(effect->program);
+    bool output_lin = framebuffer_bound ? lin_texture_write : lin_fb_write;
+    GLuint program = output_lin ? effect->program.program_lin
+                                : effect->program.program_srgb;
+    glUseProgram(program);
     
     size_t next_unit = 0;
     for (size_t i = 0; i < list_len(effect->params); i++) {
         effect_param_t* param = list_nth(effect->params, i);
-        GLint loc = glGetUniformLocation(effect->program, param->name);
+        GLint loc = glGetUniformLocation(program, param->name);
         if (loc < 0) {
             printf("warning: param \"%s\" not found\n", param->name);
             continue;
@@ -614,7 +674,7 @@ void draw_do_effect(draw_effect_t* effect) {
             char name[256];
             snprintf(name, sizeof(name), "%s_dim", param->name);
             
-            GLint dim_loc = glGetUniformLocation(effect->program, name);
+            GLint dim_loc = glGetUniformLocation(program, name);
             if (dim_loc >= 0)
                 glUniform2f(dim_loc, param->tex.w, param->tex.h);
         } else {
@@ -622,7 +682,7 @@ void draw_do_effect(draw_effect_t* effect) {
         }
     }
     
-    GLint pos_loc = glGetAttribLocation(effect->program, "aPos");
+    GLint pos_loc = glGetAttribLocation(program, "aPos");
     
     glBindBuffer(GL_ARRAY_BUFFER, pos_buf);
     static float pos[] = {-1, -1,
@@ -644,10 +704,13 @@ void draw_do_effect(draw_effect_t* effect) {
 draw_fb_t* draw_do_effect_fb(draw_effect_t* effect) {
     draw_fb_t* res = create_fb();
     glBindFramebuffer(GL_FRAMEBUFFER, res->fb);
+    framebuffer_bound = true;
     
     draw_do_effect(effect);
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    framebuffer_bound = false;
+    
     return res;
 }
 

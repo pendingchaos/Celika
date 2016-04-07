@@ -3,7 +3,6 @@
 #include "game.h"
 
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_opengl.h>
 #include <stdbool.h>
 
 #ifdef __EMSCRIPTEN__
@@ -82,13 +81,6 @@ int main() {
     
     ctx = SDL_GL_CreateContext(win);
     if (!ctx) FAIL(SDL_GetError());
-    
-    #ifndef __EMSCRIPTEN__
-    SDL_assert_release(SDL_GL_ExtensionSupported("GL_EXT_framebuffer_sRGB"));
-    SDL_assert_release(SDL_GL_ExtensionSupported("GL_EXT_texture_sRGB"));
-    SDL_assert_release(SDL_GL_ExtensionSupported("GL_ARB_framebuffer_object"));
-    glEnable(GL_FRAMEBUFFER_SRGB_EXT);
-    #endif
     
     audio_init(44100, 4096);
     draw_init();
