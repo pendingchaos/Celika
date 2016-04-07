@@ -75,6 +75,8 @@ static size_t width = 0;
 static size_t height = 0;
 static draw_tex_t* builtin_font_tex;
 static float orientation = 0;
+static float orientation_sin = 0;
+static float orientation_cos = 1;
 static float orientation_origin_x = 0;
 static float orientation_origin_y = 0;
 static float scale_x = 1;
@@ -295,8 +297,9 @@ void draw_init() {
     "attribute vec2 aUv;\n"
     "varying vec2 vfUv;\n"
     "varying vec4 vfCol;\n"
+    "uniform vec2 uDim;\n"
     "void main() {\n"
-    "    gl_Position = vec4(aPos, 0, 1);\n"
+    "    gl_Position = vec4(aPos/uDim*2.0-1.0, 0.0, 1.0);\n"
     "    vfUv = aUv;\n"
     "    vfCol = aCol;\n"
     "}\n";
@@ -513,6 +516,8 @@ void draw_end() {
 
 void draw_set_orientation(float degrees, float ox, float oy) {
     orientation = degrees / 180 * 3.14159;
+    orientation_sin = sin(orientation);
+    orientation_cos = cos(orientation);
     orientation_origin_x = ox;
     orientation_origin_y = oy;
 }
@@ -526,21 +531,19 @@ void draw_set_scale(float x, float y, float ox, float oy) {
 
 void draw_add_tri(float* tpos, draw_col_t* tcol, float* tuv) {
     float new_tpos[6];
+    float o1x = scale_origin_x - orientation_origin_x;
+    float o1y = scale_origin_y - orientation_origin_y;
     for (size_t i=0; i<6; i+=2) {
         float x = tpos[i];
         float y = tpos[i+1];
         
         //Scale
-        x = (x-scale_origin_x)*scale_x + scale_origin_x;
-        y = (y-scale_origin_y)*scale_y + scale_origin_y;
+        x = (x-scale_origin_x)*scale_x + o1x;
+        y = (y-scale_origin_y)*scale_y + o1y;
         
         //Rotate
-        x -= orientation_origin_x;
-        y -= orientation_origin_y;
-        new_tpos[i] = x*cos(orientation) - y*sin(orientation);
-        new_tpos[i+1] = x*sin(orientation) + y*cos(orientation);
-        new_tpos[i] += orientation_origin_x;
-        new_tpos[i+1] += orientation_origin_y;
+        new_tpos[i] = x*orientation_cos - y*orientation_sin + orientation_origin_x;
+        new_tpos[i+1] = x*orientation_sin + y*orientation_cos + orientation_origin_y;
     }
     
     pos = realloc(pos, (vert_count+3)*8);
@@ -603,14 +606,10 @@ static void draw_batch(batch_t batch) {
         glUniform1i(glGetUniformLocation(program, "uTex"), 0);
     }
     
-    for (size_t i = 0; i < batch.vert_count; i++) {
-        batch.pos[i*2+0] = batch.pos[i*2+0]/width*2 - 1;
-        batch.pos[i*2+1] = batch.pos[i*2+1]/height*2 - 1;
-    }
-    
     GLint pos_loc = glGetAttribLocation(program, "aPos");
     GLint col_loc = glGetAttribLocation(program, "aCol");
     GLint uv_loc = glGetAttribLocation(program, "aUv");
+    GLint dim_loc = glGetUniformLocation(program, "uDim");
     
     glEnableVertexAttribArray(pos_loc);
     glEnableVertexAttribArray(col_loc);
@@ -630,7 +629,7 @@ static void draw_batch(batch_t batch) {
         glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
     }
     
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glUniform2f(dim_loc, width, height);
     
     glDrawArrays(GL_TRIANGLES, 0, batch.vert_count);
     
