@@ -156,7 +156,7 @@ static void setup_state() {
     snake_bit_t head;
     head.x = head.y = 0;
     
-    bits = list_new(sizeof(snake_bit_t), NULL);
+    bits = list_new(sizeof(snake_bit_t));
     list_append(bits, &head);
     
     for (size_t i = 0; i < NUM_YUMYUMS; i++) {

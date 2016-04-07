@@ -344,11 +344,11 @@ static void setup_state() {
     player_miss = 0;
     req_enemy_count = 1;
     
-    player_proj = list_new(sizeof(aabb_t), NULL);
-    enemy_proj = list_new(sizeof(aabb_t), NULL);
-    enemies = list_new(sizeof(enemy_t), NULL);
-    ammo_packs = list_new(sizeof(pack_t), NULL);
-    hp_packs = list_new(sizeof(pack_t), NULL);
+    player_proj = list_new(sizeof(aabb_t));
+    enemy_proj = list_new(sizeof(aabb_t));
+    enemies = list_new(sizeof(enemy_t));
+    ammo_packs = list_new(sizeof(pack_t));
+    hp_packs = list_new(sizeof(pack_t));
     
     state = STATE_PLAYING;
 }

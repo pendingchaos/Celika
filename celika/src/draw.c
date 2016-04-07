@@ -232,7 +232,7 @@ static draw_program_t create_program(const char* name, const char* vsource, cons
 }
 
 void draw_init() {
-    fb_pool.fbs = list_new(sizeof(draw_fb_t), NULL);
+    fb_pool.fbs = list_new(sizeof(draw_fb_t));
     
     #ifdef __EMSCRIPTEN__
     srgb_textures = lin_texture_read = lin_texture_write = lin_fb_write = false;
@@ -282,7 +282,7 @@ void draw_init() {
     builtin_font_tex->aabb = create_aabb_lbwh(0, 0, BUILTIN_FONT_WIDTH*128,
                                               BUILTIN_FONT_HEIGHT);
     
-    batches = list_new(sizeof(batch_t), NULL);
+    batches = list_new(sizeof(batch_t));
     
     printf("OpenGL version: %s\n", glGetString(GL_VERSION));
     printf("OpenGL vendor: %s\n", glGetString(GL_VENDOR));
@@ -469,7 +469,7 @@ draw_effect_t* draw_create_effect(const char* shdr_fname) {
     
     free(fsource);
     
-    effect->params = list_new(sizeof(effect_param_t), NULL);
+    effect->params = list_new(sizeof(effect_param_t));
     
     return effect;
 }
@@ -654,7 +654,7 @@ void draw_prims() {
     draw_batch(batch);
     
     list_free(batches);
-    batches = list_new(sizeof(batch_t), NULL);
+    batches = list_new(sizeof(batch_t));
     
     vert_count = 0;
     pos = col = uv = NULL;

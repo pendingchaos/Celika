@@ -78,7 +78,7 @@ static void callback(void* userdata, Uint8* stream, int len) {
 }
 
 void audio_init(size_t freq, size_t sample_buf_size) {
-    sources = list_new(sizeof(audio_source_t), NULL);
+    sources = list_new(sizeof(audio_source_t));
     
     spec.freq = freq;
     spec.format = AUDIO_S16;

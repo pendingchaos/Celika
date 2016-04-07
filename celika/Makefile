@@ -37,10 +37,10 @@ libcelika$(CELIKA_EM).$(CELIKA_TARGET).a: $(celika_obj)
 
 -include $(celika_dep)
 
-.%.celika.d: %.c
+.%.celika$(CELIKA_EM).$(CELIKA_TARGET).d: %.c
 	@# -M:  generate Makefile rule
 	@# -MT: specify the rule's target
-	@$(CPP) $(CELIKA_CFLAGS) $< -M -MT $(@:.d=.o) >$@
+	@$(CPP) $(CELIKA_INTERNAL_CFLAGS) $< -M -MT $(@:.d=.o) >$@
 
 .%.celika$(CELIKA_EM).debug.o: %.c Makefile
 	@$(CC) -c $(CELIKA_INTERNAL_CFLAGS) $< -o $@ $(CELIKA_DBG_CFLAGS)

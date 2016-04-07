@@ -13,21 +13,18 @@ typedef struct list_head_t {
 struct list_t {
     size_t val_size;
     list_head_t* first;
-    list_free_t free_func;
 };
 
-list_t* list_new(size_t val_size, list_free_t free_func) {
+list_t* list_new(size_t val_size) {
    list_t* list = malloc(sizeof(list_t));
    list->val_size = val_size;
    list->first = NULL;
-   list->free_func = free_func; 
    return list;
 }
 
 void list_free(list_t* list) {
     for (list_head_t* cur = list->first; cur;) {
         list_head_t* next = cur->next;
-        if (list->free_func) list->free_func(cur+1);
         free(cur);
         cur = next;
     }
@@ -80,8 +77,6 @@ void list_remove(void* item) {
     if (head->prev) head->prev->next = head->next;
     else list->first = head->next; //It's the first one
     if (head->next) head->next->prev = head->prev;
-    
-    if (list->free_func) list->free_func(item);
     
     free(head);
 }
