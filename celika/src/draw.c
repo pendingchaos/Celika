@@ -43,10 +43,15 @@ struct draw_effect_t {
 };
 
 struct draw_fb_t {
+    bool used;
     GLuint fb;
     GLuint tex;
     size_t w, h;
 };
+
+typedef struct fb_pool_t {
+    list_t* fbs; //list_t of draw_fb_t
+} fb_pool_t;
 
 typedef struct batch_t {
     draw_tex_t* tex;
@@ -81,6 +86,75 @@ static GLuint col_buf;
 static GLuint uv_buf;
 static draw_program_t batch_program;
 static draw_program_t batch_program_tex;
+static fb_pool_t fb_pool;
+
+static draw_fb_t create_fb() {
+    draw_fb_t res;
+    res.w = width;
+    res.h = height;
+    res.used = true;
+    
+    glGenTextures(1, &res.tex);
+    glBindTexture(GL_TEXTURE_2D, res.tex);
+    
+    #ifdef __EMSCRIPTEN__
+    glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB_ALPHA : GL_RGBA, width, height, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    #else
+    glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB8_ALPHA8 : GL_RGBA8, width, height, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    #endif
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    
+    glBindTexture(GL_TEXTURE_2D, 0);
+    
+    glGenFramebuffers(1, &res.fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, res.fb);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, res.tex, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    return res;
+}
+
+static draw_fb_t* get_fb() {
+    for (size_t i = 0; i < list_len(fb_pool.fbs); i++) {
+        draw_fb_t* fb = list_nth(fb_pool.fbs, i);
+        if (!fb->used) {
+            fb->used = true;
+            return fb;
+        }
+    }
+    
+    draw_fb_t fb = create_fb();
+    list_append(fb_pool.fbs, &fb);
+    return list_nth(fb_pool.fbs, list_len(fb_pool.fbs)-1);
+}
+
+static size_t get_fb_used_count() {
+    size_t used_count = 0;
+    for (size_t i = 0; i < list_len(fb_pool.fbs); i++)
+        used_count += ((draw_fb_t*)list_nth(fb_pool.fbs, i))->used ? 1 : 0;
+    return used_count;
+}
+
+static void rel_fb(draw_fb_t* fb) {
+    fb->used = false;
+    
+    while (get_fb_used_count() < list_len(fb_pool.fbs)/2) {
+        for (size_t i = 0; i < list_len(fb_pool.fbs); i++) {
+            draw_fb_t* fb = list_nth(fb_pool.fbs, i);
+            if (!fb->used) {
+                glDeleteFramebuffers(1, &fb->fb);
+                glDeleteTextures(1, &fb->tex);
+                list_remove(fb);
+                break;
+            }
+        }
+    }
+}
 
 static GLuint _create_program(const char* name, const char* vsource, const char* fsource, bool output_srgb) {
     const char* vsources[] = {
@@ -158,6 +232,8 @@ static draw_program_t create_program(const char* name, const char* vsource, cons
 }
 
 void draw_init() {
+    fb_pool.fbs = list_new(sizeof(draw_fb_t), NULL);
+    
     #ifdef __EMSCRIPTEN__
     srgb_textures = lin_texture_read = lin_texture_write = lin_fb_write = false;
     #else
@@ -268,6 +344,13 @@ void draw_deinit() {
     glDeleteBuffers(1, &uv_buf);
     glDeleteBuffers(1, &col_buf);
     glDeleteBuffers(1, &pos_buf);
+    
+    for (size_t i = 0; i < list_len(fb_pool.fbs); i++) {
+        draw_fb_t* fb = list_nth(fb_pool.fbs, i);
+        glDeleteFramebuffers(1, &fb->fb);
+        glDeleteTextures(1, &fb->tex);
+    }
+    list_free(fb_pool.fbs);
 }
 
 draw_tex_t* draw_create_tex(const char* filename, int* w, int* h) {
@@ -504,36 +587,6 @@ void draw_add_aabb(aabb_t aabb, draw_col_t col) {
     draw_add_rect(pos, size, col);
 }
 
-static draw_fb_t* create_fb() {
-    draw_fb_t* res = malloc(sizeof(draw_fb_t));
-    res->w = width;
-    res->h = height;
-    
-    glGenTextures(1, &res->tex);
-    glBindTexture(GL_TEXTURE_2D, res->tex);
-    
-    #ifdef __EMSCRIPTEN__
-    glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB_ALPHA : GL_RGBA, width, height, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    #else
-    glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB8_ALPHA8 : GL_RGBA8, width, height, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    #endif
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
-    glGenFramebuffers(1, &res->fb);
-    glBindFramebuffer(GL_FRAMEBUFFER, res->fb);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, res->tex, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
-    return res;
-}
-
 static bool framebuffer_bound = false;
 
 static void draw_batch(batch_t batch) {
@@ -608,7 +661,7 @@ void draw_prims() {
 }
 
 draw_fb_t* draw_prims_fb() {
-    draw_fb_t* res = create_fb();
+    draw_fb_t* res = get_fb();
     glBindFramebuffer(GL_FRAMEBUFFER, res->fb);
     framebuffer_bound = true;
     
@@ -702,7 +755,7 @@ void draw_do_effect(draw_effect_t* effect) {
 }
 
 draw_fb_t* draw_do_effect_fb(draw_effect_t* effect) {
-    draw_fb_t* res = create_fb();
+    draw_fb_t* res = get_fb();
     glBindFramebuffer(GL_FRAMEBUFFER, res->fb);
     framebuffer_bound = true;
     
@@ -715,9 +768,7 @@ draw_fb_t* draw_do_effect_fb(draw_effect_t* effect) {
 }
 
 void draw_free_fb(draw_fb_t* fb) {
-    glDeleteFramebuffers(1, &fb->fb);
-    glDeleteTextures(1, &fb->tex);
-    free(fb);
+    rel_fb(fb);
 }
 
 void draw_text(const char* text, float* pos, draw_col_t col, float height) {
