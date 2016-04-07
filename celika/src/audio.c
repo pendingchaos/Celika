@@ -8,6 +8,7 @@
 #include <stdio.h>
 
 struct sound_t {
+    size_t ref_count;
     size_t sample_rate;
     size_t sample_count;
     short* samples; //interleaved stereo samples
@@ -67,6 +68,7 @@ static void callback(void* userdata, Uint8* stream, int len) {
         source->offset += sample_count;
         
         if (end && source->gc) {
+            audio_del_sound(source->sound);
             list_remove(source);
             i--;
         } else if (end) {
@@ -104,6 +106,7 @@ void audio_deinit() {
 
 sound_t* audio_create_sound(const char* filename) {
     sound_t* sound = malloc(sizeof(sound_t));
+    sound->ref_count = 1;
     
     OggVorbis_File vf;
     if (ov_fopen(filename, &vf) < 0) {
@@ -154,8 +157,12 @@ sound_t* audio_create_sound(const char* filename) {
 }
 
 void audio_del_sound(sound_t* sound) {
-    free(sound->samples);
-    free(sound);
+    sound->ref_count--;
+    
+    if (!sound->ref_count) {
+        free(sound->samples);
+        free(sound);
+    }
 }
 
 audio_source_t* audio_play_sound(sound_t* sound, float volume, float offset, bool gc) {
@@ -163,6 +170,7 @@ audio_source_t* audio_play_sound(sound_t* sound, float volume, float offset, boo
     
     audio_source_t source;
     source.sound = sound;
+    sound->ref_count++;
     source.offset = offset * spec.freq;
     source.volume = volume;
     source.gc = gc;
@@ -211,6 +219,7 @@ bool audio_get_src_done(audio_source_t* src) {
 
 void audio_del_src(audio_source_t* src) {
     SDL_LockAudioDevice(dev);
+    audio_del_sound(src->sound);
     list_remove(src);
     SDL_UnlockAudioDevice(dev);
 }

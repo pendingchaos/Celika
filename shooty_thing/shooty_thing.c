@@ -14,8 +14,11 @@
 #define ENEMY_TEX "SpaceShooterRedux/PNG/ufoRed.png"
 #define PLAYER_PROJ_TEX "SpaceShooterRedux/PNG/Lasers/laserGreen10.png"
 #define ENEMY_PROJ_TEX "SpaceShooterRedux/PNG/Lasers/laserRed16.png"
-#define HP_PACK_TEX "SpaceShooterRedux/PNG/Power-ups/pill_yellow.png"
-#define AMMO_PACK_TEX "SpaceShooterRedux/PNG/Power-ups/bolt_gold.png"
+#define HP_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/pill_yellow.png"
+#define AMMO_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/bolt_gold.png"
+#define SHIELD0_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/shield_bronze.png"
+#define SHIELD1_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/shield_silver.png"
+#define SHIELD2_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/shield_gold.png"
 #define BG0_TEX "SpaceShooterRedux/Backgrounds/black.png"
 #define BG1_TEX "SpaceShooterRedux/Backgrounds/blue.png"
 #define BG2_TEX "SpaceShooterRedux/Backgrounds/darkPurple.png"
@@ -45,20 +48,29 @@
 
 #define ENEMY_COUNT_UPDATE_RATE 0.25
 
-#define AMMO_PACK_CHANCE 0.3
-#define AMMO_PACK_SPEED 100
-#define AMMO_PACK_INC 0.25
-#define AMMO_PACK_FADE_RATE 10
+#define AMMO_COLLECTABLE_CHANCE 0.3
+#define AMMO_COLLECTABLE_SPEED 100
+#define AMMO_COLLECTABLE_INC 0.25
+#define AMMO_COLLECTABLE_FADE_RATE 10
 
-#define HP_PACK_CHANCE 0.2
-#define HP_PACK_SPEED 100
-#define HP_PACK_INC 0.1
-#define HP_PACK_FADE_RATE 10
+#define HP_COLLECTABLE_CHANCE 0.2
+#define HP_COLLECTABLE_SPEED 100
+#define HP_COLLECTABLE_INC 0.1
+#define HP_COLLECTABLE_FADE_RATE 10
 
 typedef enum state_t {
     STATE_PLAYING,
     STATE_LOST
 } state_t;
+
+typedef enum collectable_type_t {
+    COLLECT_TYPE_AMMO,
+    COLLECT_TYPE_HP,
+    COLLECT_TYPE_SHIELD0,
+    COLLECT_TYPE_SHIELD1,
+    COLLECT_TYPE_SHIELD2,
+    COLLECT_TYPE_MAX
+} collectable_type_t;
 
 typedef struct enemy_t {
     aabb_t aabb;
@@ -68,19 +80,18 @@ typedef struct enemy_t {
     float alpha;
 } enemy_t;
 
-typedef struct pack_t {
+typedef struct collectable_t {
     aabb_t aabb;
     bool taken;
     float alpha;
-} pack_t;
+} collectable_t;
 
 static draw_tex_t* background_tex[6];
 static draw_tex_t* player_tex;
 static draw_tex_t* player_proj_tex;
 static draw_tex_t* enemy_proj_tex;
 static draw_tex_t* enemy_tex;
-static draw_tex_t* hp_pack_tex;
-static draw_tex_t* ammo_pack_tex;
+static draw_tex_t* collectable_tex[COLLECT_TYPE_MAX];
 static draw_effect_t* passthough_effect;
 
 static state_t state;
@@ -97,8 +108,7 @@ static size_t player_miss;
 static list_t* player_proj; //list of aabb_t
 static list_t* enemy_proj; //list of aabb_t
 static list_t* enemies; //list of enemy_t
-static list_t* ammo_packs; //list of pack_t
-static list_t* hp_packs; //list of pack_t
+static list_t* collectables[COLLECT_TYPE_MAX]; //list of collectable_t
 
 static float req_enemy_count;
 
@@ -144,24 +154,14 @@ static void create_enemy() {
     list_append(enemies, &enemy);
 }
 
-static void create_ammo_pack() {
-    pack_t pack;
-    pack.aabb = draw_get_tex_aabb(ammo_pack_tex);
-    pack.aabb.left = rand()%WINDOW_WIDTH - pack.aabb.width/2;
-    pack.aabb.bottom = WINDOW_HEIGHT;
-    pack.taken = false;
-    pack.alpha = 1;
-    list_append(ammo_packs, &pack);
-}
-
-static void create_hp_pack() {
-    pack_t pack;
-    pack.aabb = draw_get_tex_aabb(hp_pack_tex);
-    pack.aabb.left = rand()%WINDOW_WIDTH - pack.aabb.width/2;
-    pack.aabb.bottom = WINDOW_HEIGHT;
-    pack.taken = false;
-    pack.alpha = 1;
-    list_append(hp_packs, &pack);
+static void create_collectable(collectable_type_t type) {
+    collectable_t collectable;
+    collectable.aabb = draw_get_tex_aabb(collectable_tex[type]);
+    collectable.aabb.left = rand()%WINDOW_WIDTH - collectable.aabb.width/2;
+    collectable.aabb.bottom = WINDOW_HEIGHT;
+    collectable.taken = false;
+    collectable.alpha = 1;
+    list_append(collectables[type], &collectable);
 }
 
 static void update_player(float frametime) {
@@ -252,54 +252,46 @@ static void update_enemies(float frametime) {
     }
 }
 
-static void update_packs(float frametime) {
-    for (ptrdiff_t i = 0; i < list_len(ammo_packs); i++) {
-        pack_t* ammo_pack = list_nth(ammo_packs, i);
-        
-        ammo_pack->aabb.bottom -= frametime * AMMO_PACK_SPEED;
-        if (aabb_top(ammo_pack->aabb) < 0) {
-            list_remove(ammo_pack);
-            i--;
-            continue;
-        }
-        
-        if (ammo_pack->taken) {
-            ammo_pack->alpha -= AMMO_PACK_FADE_RATE * frametime;
-            if (ammo_pack->alpha <= 0) {
-                list_remove(ammo_pack);
-                i--;
-            }
-            continue;
-        }
-        
-        if (intersect_aabb(ammo_pack->aabb, player_aabb)) {
-            ammo_pack->taken = true;
-            player_ammo += AMMO_PACK_INC;
-        }
-    }
+static void update_collectables(float frametime) {
+    static float collectable_speed[] = {
+        [COLLECT_TYPE_AMMO] = AMMO_COLLECTABLE_SPEED,
+        [COLLECT_TYPE_HP] = HP_COLLECTABLE_SPEED};
     
-    for (size_t i = 0; i < list_len(hp_packs); i++) {
-        pack_t* hp_pack = list_nth(hp_packs, i);
-        
-        hp_pack->aabb.bottom -= frametime * HP_PACK_SPEED;
-        if (aabb_top(hp_pack->aabb) < 0) {
-            list_remove(hp_pack);
-            i--;
-            continue;
-        }
-        
-        if (hp_pack->taken) {
-            hp_pack->alpha -= HP_PACK_FADE_RATE * frametime;
-            if (hp_pack->alpha <= 0) {
-                list_remove(hp_pack);
+    static float collectable_fade_rate[] = {
+        [COLLECT_TYPE_AMMO] = AMMO_COLLECTABLE_FADE_RATE,
+        [COLLECT_TYPE_HP] = HP_COLLECTABLE_FADE_RATE};
+    
+    for (collectable_type_t type = 0; type < COLLECT_TYPE_MAX; type++) {
+        for (ptrdiff_t i = 0; i < list_len(collectables[type]); i++) {
+            collectable_t* collectable = list_nth(collectables[type], i);
+            
+            collectable->aabb.bottom -= frametime * collectable_speed[type];
+            if (aabb_top(collectable->aabb) < 0) {
+                list_remove(collectable);
                 i--;
+                continue;
             }
-            continue;
-        }
-        
-        if (intersect_aabb(hp_pack->aabb, player_aabb)) {
-            hp_pack->taken = true;
-            player_hp += HP_PACK_INC;
+            
+            if (collectable->taken) {
+                collectable->alpha -= collectable_fade_rate[type] * frametime;
+                if (collectable->alpha <= 0) {
+                    list_remove(collectable);
+                    i--;
+                }
+                continue;
+            }
+            
+            if (intersect_aabb(collectable->aabb, player_aabb)) {
+                collectable->taken = true;
+                switch (type) {
+                case COLLECT_TYPE_AMMO:
+                    player_ammo += AMMO_COLLECTABLE_INC;
+                    break;
+                case COLLECT_TYPE_HP:
+                    player_hp += HP_COLLECTABLE_INC;
+                    break;
+                }
+            }
         }
     }
 }
@@ -308,7 +300,7 @@ static void update(float frametime) {
     update_player(frametime);
     update_proj(frametime);
     update_enemies(frametime);
-    update_packs(frametime);
+    update_collectables(frametime);
     
     req_enemy_count += frametime * ENEMY_COUNT_UPDATE_RATE;
     if ((int)req_enemy_count > MAX_ENEMIES)
@@ -321,11 +313,11 @@ static void update(float frametime) {
     for (size_t i = 0; i < ((int)req_enemy_count)-enemy_count; i++)
         create_enemy();
     
-    if (rand()/(double)RAND_MAX > (1.0-AMMO_PACK_CHANCE*frametime))
-        create_ammo_pack();
+    if (rand()/(double)RAND_MAX > (1.0-AMMO_COLLECTABLE_CHANCE*frametime))
+        create_collectable(COLLECT_TYPE_AMMO);
     
-    if (rand()/(double)RAND_MAX > (1.0-HP_PACK_CHANCE*frametime))
-        create_hp_pack();
+    if (rand()/(double)RAND_MAX > (1.0-HP_COLLECTABLE_CHANCE*frametime))
+        create_collectable(COLLECT_TYPE_HP);
     
     if (player_hp <= 0) {
         state = STATE_LOST;
@@ -347,15 +339,15 @@ static void setup_state() {
     player_proj = list_new(sizeof(aabb_t));
     enemy_proj = list_new(sizeof(aabb_t));
     enemies = list_new(sizeof(enemy_t));
-    ammo_packs = list_new(sizeof(pack_t));
-    hp_packs = list_new(sizeof(pack_t));
+    for (size_t i = 0; i < COLLECT_TYPE_MAX; i++)
+        collectables[i] = list_new(sizeof(collectable_t));
     
     state = STATE_PLAYING;
 }
 
 static void cleanup_state() {
-    list_free(hp_packs);
-    list_free(ammo_packs);
+    for (size_t i = 0; i < COLLECT_TYPE_MAX; i++)
+        list_free(collectables[i]);
     list_free(enemies);
     list_free(enemy_proj);
     list_free(player_proj);
@@ -371,8 +363,11 @@ void celika_game_init(int* w, int* h) {
     enemy_tex = draw_create_scaled_tex(ENEMY_TEX, 0, 30, NULL, NULL);
     player_proj_tex = draw_create_scaled_tex(PLAYER_PROJ_TEX, 0, 25, NULL, NULL);
     enemy_proj_tex = draw_create_scaled_tex(ENEMY_PROJ_TEX, 0, 25, NULL, NULL);
-    hp_pack_tex = draw_create_scaled_tex(HP_PACK_TEX, 0, 25, NULL, NULL);
-    ammo_pack_tex = draw_create_scaled_tex(AMMO_PACK_TEX, 0, 25, NULL, NULL);
+    collectable_tex[COLLECT_TYPE_HP] = draw_create_scaled_tex(HP_COLLECTABLE_TEX, 0, 25, NULL, NULL);
+    collectable_tex[COLLECT_TYPE_AMMO] = draw_create_scaled_tex(AMMO_COLLECTABLE_TEX, 0, 25, NULL, NULL);
+    collectable_tex[COLLECT_TYPE_SHIELD0] = draw_create_scaled_tex(SHIELD0_COLLECTABLE_TEX, 0, 25, NULL, NULL);
+    collectable_tex[COLLECT_TYPE_SHIELD1] = draw_create_scaled_tex(SHIELD1_COLLECTABLE_TEX, 0, 25, NULL, NULL);
+    collectable_tex[COLLECT_TYPE_SHIELD2] = draw_create_scaled_tex(SHIELD2_COLLECTABLE_TEX, 0, 25, NULL, NULL);
     background_tex[0] = draw_create_tex(BG0_TEX, NULL, NULL);
     background_tex[1] = draw_create_tex(BG1_TEX, NULL, NULL);
     background_tex[2] = draw_create_tex(BG2_TEX, NULL, NULL);
@@ -401,8 +396,8 @@ void celika_game_deinit() {
     
     for (size_t i = 0; i < 4; i++)
         draw_del_tex(background_tex[i]);
-    draw_del_tex(ammo_pack_tex);
-    draw_del_tex(hp_pack_tex);
+    for (size_t i = 0; i < COLLECT_TYPE_MAX; i++)
+        draw_del_tex(collectable_tex[i]);
     draw_del_tex(enemy_proj_tex);
     draw_del_tex(player_proj_tex);
     draw_del_tex(enemy_tex);
@@ -456,17 +451,12 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
         draw_add_aabb(*(aabb_t*)list_nth(enemy_proj, i), draw_rgb(1, 1, 1));
     draw_set_tex(NULL);
     
-    draw_set_tex(ammo_pack_tex);
-    for (size_t i = 0; i < list_len(ammo_packs); i++) {
-        pack_t* pack = list_nth(ammo_packs, i);
-        draw_add_aabb(pack->aabb, draw_rgba(1, 1, 1, pack->alpha));
-    }
-    draw_set_tex(NULL);
-    
-    draw_set_tex(hp_pack_tex);
-    for (size_t i = 0; i < list_len(hp_packs); i++) {
-        pack_t* pack = list_nth(hp_packs, i);
-        draw_add_aabb(pack->aabb, draw_rgba(1, 1, 1, pack->alpha));
+    for (size_t i = 0; i < COLLECT_TYPE_MAX; i++) {
+        draw_set_tex(collectable_tex[i]);
+        for (size_t j = 0; j < list_len(collectables[i]); j++) {
+            collectable_t* collectable = list_nth(collectables[i], j);
+            draw_add_aabb(collectable->aabb, draw_rgba(1, 1, 1, collectable->alpha));
+        }
     }
     draw_set_tex(NULL);
     
