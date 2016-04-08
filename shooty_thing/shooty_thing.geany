@@ -28,7 +28,9 @@ long_line_behaviour=1
 long_line_column=72
 
 [files]
-current_page=-1
+current_page=0
+FILE_NAME_0=380;Python;0;EUTF-8;0;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fprojtest%2Fcelikaproj.py;0;4
+FILE_NAME_1=319;Python;0;EUTF-8;0;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fprojtest%2Ftest.py;0;4
 
 [VTE]
 last_dir=/home/rugrats

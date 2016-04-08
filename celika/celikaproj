@@ -1,0 +1,190 @@
+#!/usr/bin/python2
+import sys
+import os
+import os.path
+import xml.sax.saxutils
+
+celika_dir = None
+celika_cflags = ''
+celika_ldflags = ''
+celika_cflags_native = ''
+celika_ldflags_native = ''
+celika_cflags_emscripten = ''
+celika_ldflags_emscripten = ''
+celika_runopt = ''
+celika_src = []
+celika_embedded_files = []
+celika_projname = None
+
+def overwrite_thing(f):
+    try:
+        open(f, 'r')
+        print 'Overwrite %s?' % os.path.abspath(f)
+        while True:
+            c = raw_input('y/n: ')
+            if c.lower() == 'y':
+                return
+            elif c.lower() == 'n':
+                sys.exit()
+    except IOError:
+        pass
+
+def celika_gen(filename):
+    global celika_dir
+    
+    if celika_dir == None:
+        print "Error: celika_dir is None"
+        sys.exit(1)
+    
+    if celika_projname == None:
+        print "Error: celika_projname is None"
+        sys.exit(1)
+    
+    if not celika_dir.endswith('/'):
+        celika_dir += '/'
+    
+    html_file = celika_projname + '.html'
+    
+    overwrite_thing('Makefile')
+    overwrite_thing(html_file)
+    
+    open('Makefile', 'w').write('''# Generated with celikaproj. Do not edit.
+.PHONY: all
+ifdef EMSCRIPTEN
+all: {projname}.js
+target = emscripten
+else
+all: {projname}
+target = native
+endif
+
+CELIKA_DIR = {celikadir}
+include {celikadir}Makefile
+
+src = {celikasrc}
+obj = $(join $(dir $(src)), $(addprefix ., $(notdir $(src:.c=.$(target).o))))
+dep = $(obj:.o=_dep.d)
+embeddedfiles = {celikaembeddedfiles}
+
+ifdef EMSCRIPTEN
+{projname}.js: $(obj)
+\t@$(CC) $(obj) $(CELIKA_LDFLAGS) {ldflagsemscripten} {ldflags} -o $@ -Oz --memory-init-file 0 $(addprefix --embed-file , $(embeddedfiles))
+else
+{projname}: $(obj)
+\t@$(CC) $(obj) $(CELIKA_LDFLAGS) {ldflagsnative} {ldflags} -o $@
+endif
+
+-include $(dep)
+
+.%.$(target)_dep.d: %.c Makefile
+\t@$(CPP) {cflags} $(CELIKA_CFLAGS) $< -M -MT $(@:_dep.d=.o) >$@
+
+.%.$(target).o: %.c Makefile
+ifdef EMSCRIPTEN
+\t@$(CC) -c $< {cflags} {cflagsemscripten} $(CELIKA_CFLAGS) -o $@
+else
+\t@$(CC) -c $< {cflags} {cflagsnative} $(CELIKA_CFLAGS) -o $@
+endif
+
+.PHONY: clean
+clean:
+\t@rm -f $(dep) $(obj) {projname}.js {projname}
+
+Makefile: {scriptname} {filename}
+\t@python2 {scriptname} gen {filename}
+
+{htmlfile}: {scriptname} {filename}
+\t@python2 {scriptname} gen {filename}
+
+ifndef EMSCRIPTEN
+.PHONY: valgrind
+valgrind: {projname}
+\t@valgrind --track-origins=yes --leak-check=full ./{projname} {runopt}
+
+.PHONY: run
+run: {projname}
+\t@./{projname} {runopt}
+
+.PHONY: apitrace
+apitrace: {projname}
+\t@apitrace trace -o {projname}.trace ./{projname}
+\t@qapitrace {projname}.trace
+\t@rm -f {projname}.trace
+endif'''.format(htmlfile=html_file,
+                filename=filename,
+                celikaembeddedfiles=celika_embedded_files,
+                celikasrc=celika_src,
+                scriptname=sys.argv[0],
+                cflags=celika_cflags,
+                ldflags=celika_ldflags,
+                cflagsnative=celika_cflags_native,
+                ldflagsnative=celika_ldflags_native,
+                cflagsemscripten=celika_cflags_emscripten,
+                ldflagsemscripten=celika_ldflags_emscripten,
+                runopt=celika_runopt,
+                celikadir=celika_dir,
+                projname=celika_projname))
+    
+    open(html_file, 'w').write('''<!doctype html>
+<!--Generated with celikaproj. Do not edit.-->
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+  </head>
+  <body>
+    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+
+    <script type='text/javascript'>
+    var canvas = document.getElementById('canvas');
+    
+    canvas.addEventListener("webglcontextlost", function(e) {lbrace}
+        alert('WebGL context lost. You will need to reload the page.');
+        e.preventDefault();
+    {rbrace}, false);
+    
+    var Module = {lbrace}
+        preRun: [],
+        postRun: [],
+        printErr: function(text) {lbrace}
+            if (arguments.length > 1)
+                text = Array.prototype.slice.call(arguments).join(' ');
+            console.error(text);
+        {rbrace},
+        canvas: canvas
+      {rbrace};
+    </script>
+    <script async type="text/javascript" src={jsfile}></script>
+  </body>
+</html>
+'''.format(lbrace='{',
+           rbrace='}',
+           jsfile=xml.sax.saxutils.quoteattr(celika_projname+'.js')))
+
+if len(sys.argv) == 1:
+    print 'Usage:'
+    print '%s gen   [file=celikafile.py]   Generates stuff' % sys.argv[0]
+    print '%s clean [file=celikafile.py]   Cleans stuff up' % sys.argv[0]
+    sys.exit()
+
+celikafile = sys.argv[2] if len(sys.argv)==3 else 'celikafile.py'
+
+exec open(celikafile).read()
+
+if sys.argv[1] == 'gen':
+    celika_gen(celikafile)
+elif sys.argv[1] == 'clean':
+    try:
+        open('Makefile', 'r')
+        try: os.system('make clean')
+        except OSError: pass
+        
+        try: os.system('EMSCRIPTEN=1 make clean')
+        except OSError: pass
+    except IOError:
+        pass
+    
+    try: os.remove('Makefile')
+    except OSError: pass
+    
+    try: os.remove('%s.html' % celika_projname)
+    except OSError: pass
