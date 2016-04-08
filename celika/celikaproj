@@ -67,10 +67,10 @@ dep = $(obj:.o=_dep.d)
 embeddedfiles = {celikaembeddedfiles}
 
 ifdef EMSCRIPTEN
-{projname}.js: $(obj)
-\t@$(CC) $(obj) $(CELIKA_LDFLAGS) {ldflagsemscripten} {ldflags} -o $@ -Oz --memory-init-file 0 $(addprefix --embed-file , $(embeddedfiles))
+{projname}.js: $(obj) $(CELIKA_DEPS)
+\t@$(CC) $(obj) $(CELIKA_LDFLAGS) {ldflagsemscripten} {ldflags} -o $@ --memory-init-file 0 $(addprefix --embed-file , $(embeddedfiles))
 else
-{projname}: $(obj)
+{projname}: $(obj) $(CELIKA_DEPS)
 \t@$(CC) $(obj) $(CELIKA_LDFLAGS) {ldflagsnative} {ldflags} -o $@
 endif
 

@@ -1,12 +1,12 @@
 celika_dir = '../celika/'
-celika_cflags = '-pedantic -Wall -std=c11 -g'
+celika_cflags = '-pedantic -Wall -std=c11'
 celika_ldflags = ''
-celika_cflags_native = ''
-celika_ldflags_native = ''
-celika_cflags_emscripten = ''
-celika_ldflags_emscripten = ''
+celika_cflags_native = '-g'
+celika_ldflags_native = '-g'
+celika_cflags_emscripten = '-Oz'
+celika_ldflags_emscripten = '-Oz'
 celika_runopt = ''
-celika_src = 'shooty_thing.c'
+celika_src = '$(wildcard src/*.c)'
 celika_embedded_files = 'SpaceShooterRedux/PNG/playerShip3_green.png \
 SpaceShooterRedux/PNG/ufoRed.png \
 SpaceShooterRedux/PNG/ufoGreen.png \
@@ -31,5 +31,6 @@ SpaceShooterRedux/Bonus/sfx_zap.ogg \
 SpaceShooterRedux/PNG/Power-ups/shield_bronze.png \
 SpaceShooterRedux/PNG/Power-ups/shield_silver.png \
 SpaceShooterRedux/PNG/Power-ups/shield_gold.png \
-SpaceShooterRedux/PNG/Effects/shield1.png'
-celika_projname = 'shooty-thing'
+SpaceShooterRedux/PNG/Effects/shield1.png \
+SpaceShooterRedux/PNG/UI/buttonGreen.png'
+celika_projname = 'shooty-thing' 

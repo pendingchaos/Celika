@@ -411,8 +411,8 @@ draw_tex_t* draw_create_scaled_tex(const char* filename, int reqw, int reqh, int
         w = reqw;
         h = reqh;
     } else if (reqw) {
-        w = reqw;
         h *= reqw/(double)w;
+        w = reqw;
     } else if (reqh) {
         w *= reqh/(double)h;
         h = reqh;

@@ -1,4 +1,6 @@
 #include "celika/celika.h"
+#include "shooty_thing.h"
+#include "shared.h"
 
 #include <SDL2/SDL_keyboard.h>
 #include <SDL2/SDL_mouse.h>
@@ -6,92 +8,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
-
-#define WINDOW_WIDTH 500
-#define WINDOW_HEIGHT 500
-
-#define ENEMY_TEX_COUNT 4
-
-#define PLAYER_TEX "SpaceShooterRedux/PNG/playerShip3_green.png"
-#define ENEMY_TEX0 "SpaceShooterRedux/PNG/ufoRed.png"
-#define ENEMY_TEX1 "SpaceShooterRedux/PNG/ufoGreen.png"
-#define ENEMY_TEX2 "SpaceShooterRedux/PNG/ufoBlue.png"
-#define ENEMY_TEX3 "SpaceShooterRedux/PNG/ufoYellow.png"
-#define PLAYER_PROJ_TEX "SpaceShooterRedux/PNG/Lasers/laserGreen10.png"
-#define ENEMY_PROJ_TEX "SpaceShooterRedux/PNG/Lasers/laserRed16.png"
-#define HP_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/pill_yellow.png"
-#define AMMO_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/bolt_gold.png"
-#define SHIELD0_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/shield_bronze.png"
-#define SHIELD1_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/shield_silver.png"
-#define SHIELD2_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/shield_gold.png"
-#define SHIELD_TEX "SpaceShooterRedux/PNG/Effects/shield1.png"
-#define BG0_TEX "SpaceShooterRedux/Backgrounds/black.png"
-#define BG1_TEX "SpaceShooterRedux/Backgrounds/blue.png"
-#define BG2_TEX "SpaceShooterRedux/Backgrounds/darkPurple.png"
-#define BG3_TEX "SpaceShooterRedux/Backgrounds/purple.png"
-
-#define LASER0_SOUND "SpaceShooterRedux/Bonus/sfx_laser1.ogg"
-#define LASER1_SOUND "SpaceShooterRedux/Bonus/sfx_laser2.ogg"
-#define LOSE_SOUND "SpaceShooterRedux/Bonus/sfx_lose.ogg"
-#define SHIELDUP_SOUND "SpaceShooterRedux/Bonus/sfx_shieldUp.ogg"
-#define SHIELDDOWN_SOUND "SpaceShooterRedux/Bonus/sfx_shieldDown.ogg"
-#define HP_PICKUP_SOUND "SpaceShooterRedux/Bonus/sfx_twoTone.ogg"
-#define AMMO_PICKUP_SOUND "SpaceShooterRedux/Bonus/sfx_zap.ogg"
-
-#define BACKGROUND_SCROLL_SPEED 128
-#define BACKGROUND_CHANGE_SPEED 0.1
-
-#define PLAYER_FIRE_INTERVAL 0.1
-
-#define PLAYER_PROJ_SPEED 400
-#define PLAYER_PROJ_AMMO_USAGE 0.01
-
-#define ENEMY_SPEED 200
-#define ENEMY_FIRE_INTERVAL 0.8
-#define ENEMY_HIT_DAMAGE 0.05
-#define ENEMY_FIRE_DIST_THRESHOLD 20
-#define ENEMY_FADE_RATE 10
-#define MAX_ENEMIES 15
-
-#define ENEMY_PROJ_SPEED 400
-#define ENEMY_PROJ_HIT_DAMAGE 0.025
-
-#define ENEMY_COUNT_UPDATE_RATE 0.25
-
-#define AMMO_COLLECTABLE_CHANCE 0.3
-#define AMMO_COLLECTABLE_SPEED 100
-#define AMMO_COLLECTABLE_INC 0.25
-#define AMMO_COLLECTABLE_FADE_RATE 10
-
-#define HP_COLLECTABLE_CHANCE 0.2
-#define HP_COLLECTABLE_SPEED 100
-#define HP_COLLECTABLE_INC 0.1
-#define HP_COLLECTABLE_FADE_RATE 10
-
-#define SHIELD0_COLLECTABLE_SPEED 100
-#define SHIELD0_COLLECTABLE_FADE_RATE 10
-#define SHIELD0_COLLECTABLE_CHANCE 0.1
-#define SHIELD1_COLLECTABLE_SPEED 100
-#define SHIELD1_COLLECTABLE_FADE_RATE 10
-#define SHIELD1_COLLECTABLE_CHANCE 0.05
-#define SHIELD2_COLLECTABLE_SPEED 100
-#define SHIELD2_COLLECTABLE_FADE_RATE 10
-#define SHIELD2_COLLECTABLE_CHANCE 0.025
-#define SHIELD_TIMEOUT 10
-
-typedef enum state_t {
-    STATE_PLAYING,
-    STATE_LOST
-} state_t;
-
-typedef enum collectable_type_t {
-    COLLECT_TYPE_AMMO,
-    COLLECT_TYPE_HP,
-    COLLECT_TYPE_SHIELD0,
-    COLLECT_TYPE_SHIELD1,
-    COLLECT_TYPE_SHIELD2,
-    COLLECT_TYPE_MAX
-} collectable_type_t;
 
 typedef enum shield_strength_t {
     SHIELD_NONE,
@@ -123,19 +39,6 @@ static const float shield_reduce[] = {
     [SHIELD_STRONG] = 0.9
 };
 
-static draw_tex_t* background_tex[6];
-static draw_tex_t* player_tex;
-static draw_tex_t* player_proj_tex;
-static draw_tex_t* enemy_proj_tex;
-static draw_tex_t* enemy_tex[4];
-static draw_tex_t* collectable_tex[COLLECT_TYPE_MAX];
-static draw_tex_t* shield_tex;
-static draw_effect_t* passthough_effect;
-
-static state_t state;
-
-static float background_scroll;
-
 static aabb_t player_aabb;
 static float player_fire_timeout;
 static float player_hp;
@@ -151,13 +54,6 @@ static list_t* enemies; //list of enemy_t
 static list_t* collectables[COLLECT_TYPE_MAX]; //list of collectable_t
 
 static float req_enemy_count;
-
-static sound_t* laser_sounds[2];
-static sound_t* lose_sound;
-static sound_t* shield_up_sound;
-static sound_t* shield_down_sound;
-static sound_t* hp_pickup_sound;
-static sound_t* ammo_pickup_sound;
 
 static void create_player_proj() {
     aabb_t aabb = draw_get_tex_aabb(player_proj_tex);
@@ -446,72 +342,19 @@ static void cleanup_state() {
     list_free(player_proj);
 }
 
-void celika_game_init(int* w, int* h) {
-    *w = WINDOW_WIDTH;
-    *h = WINDOW_HEIGHT;
-    
+void play_state_init() {
     srand(time(NULL));
     
-    player_tex = draw_create_scaled_tex_aabb(PLAYER_TEX, 0, 30, &player_aabb);
-    enemy_tex[0] = draw_create_scaled_tex(ENEMY_TEX0, 0, 30, NULL, NULL);
-    enemy_tex[1] = draw_create_scaled_tex(ENEMY_TEX1, 0, 30, NULL, NULL);
-    enemy_tex[2] = draw_create_scaled_tex(ENEMY_TEX2, 0, 30, NULL, NULL);
-    enemy_tex[3] = draw_create_scaled_tex(ENEMY_TEX3, 0, 30, NULL, NULL);
-    player_proj_tex = draw_create_scaled_tex(PLAYER_PROJ_TEX, 0, 25, NULL, NULL);
-    enemy_proj_tex = draw_create_scaled_tex(ENEMY_PROJ_TEX, 0, 25, NULL, NULL);
-    collectable_tex[COLLECT_TYPE_HP] = draw_create_scaled_tex(HP_COLLECTABLE_TEX, 0, 25, NULL, NULL);
-    collectable_tex[COLLECT_TYPE_AMMO] = draw_create_scaled_tex(AMMO_COLLECTABLE_TEX, 0, 25, NULL, NULL);
-    collectable_tex[COLLECT_TYPE_SHIELD0] = draw_create_scaled_tex(SHIELD0_COLLECTABLE_TEX, 0, 25, NULL, NULL);
-    collectable_tex[COLLECT_TYPE_SHIELD1] = draw_create_scaled_tex(SHIELD1_COLLECTABLE_TEX, 0, 25, NULL, NULL);
-    collectable_tex[COLLECT_TYPE_SHIELD2] = draw_create_scaled_tex(SHIELD2_COLLECTABLE_TEX, 0, 25, NULL, NULL);
-    shield_tex = draw_create_scaled_tex(SHIELD_TEX, 0, 43, NULL, NULL);
-    background_tex[0] = draw_create_tex(BG0_TEX, NULL, NULL);
-    background_tex[1] = draw_create_tex(BG1_TEX, NULL, NULL);
-    background_tex[2] = draw_create_tex(BG2_TEX, NULL, NULL);
-    background_tex[3] = draw_create_tex(BG3_TEX, NULL, NULL);
-    background_tex[4] = background_tex[2];
-    background_tex[5] = background_tex[1];
-    background_scroll = 0;
-    
-    passthough_effect = draw_create_effect("shaders/passthough.glsl");
-    
-    laser_sounds[0] = audio_create_sound(LASER0_SOUND);
-    laser_sounds[1] = audio_create_sound(LASER1_SOUND);
-    lose_sound = audio_create_sound(LOSE_SOUND);
-    shield_up_sound = audio_create_sound(SHIELDUP_SOUND);
-    shield_down_sound = audio_create_sound(SHIELDDOWN_SOUND);
-    hp_pickup_sound = audio_create_sound(HP_PICKUP_SOUND);
-    ammo_pickup_sound = audio_create_sound(AMMO_PICKUP_SOUND);
+    player_aabb = draw_get_tex_aabb(player_tex);
     
     setup_state();
 }
 
-void celika_game_deinit() {
+void play_state_deinit() {
     cleanup_state();
-    
-    audio_del_sound(ammo_pickup_sound);
-    audio_del_sound(hp_pickup_sound);
-    audio_del_sound(shield_down_sound);
-    audio_del_sound(shield_up_sound);
-    audio_del_sound(lose_sound);
-    audio_del_sound(laser_sounds[0]);
-    audio_del_sound(laser_sounds[1]);
-    
-    draw_del_effect(passthough_effect);
-    
-    for (size_t i = 0; i < 4; i++)
-        draw_del_tex(background_tex[i]);
-    draw_del_tex(shield_tex);
-    for (size_t i = 0; i < COLLECT_TYPE_MAX; i++)
-        draw_del_tex(collectable_tex[i]);
-    draw_del_tex(enemy_proj_tex);
-    draw_del_tex(player_proj_tex);
-    for (size_t i = 0; i < ENEMY_TEX_COUNT; i++)
-        draw_del_tex(enemy_tex[i]);
-    draw_del_tex(player_tex);
 }
 
-void celika_game_frame(size_t w, size_t h, float frametime) {
+void play_state_frame(size_t w, size_t h, float frametime) {
     if (state == STATE_PLAYING)
         update(frametime);
     else if (state == STATE_LOST) {
@@ -519,32 +362,11 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
         setup_state();
     }
     
-    float time = background_scroll / (double)BACKGROUND_SCROLL_SPEED;
-    
-    time *= BACKGROUND_CHANGE_SPEED;
-    draw_tex_t* background_textures[] = {background_tex[(int)floor(time) % 6],
-                                         background_tex[(int)ceil(time) % 6]};
-    float background_alpha[] = {1, time-floor(time)};
-    for (size_t i = 0; i < 2; i++) {
-        draw_tex_t* tex = background_textures[i];
-        draw_set_tex(tex);
-        aabb_t bb = draw_get_tex_aabb(tex);
-        for (size_t x = 0; x < ceil(w/bb.width); x++) {
-            for (size_t y = 0; y < ceil(h/bb.height)+1; y++) {
-                float pos[] = {x*bb.width, y*bb.height};
-                pos[1] -= ((int)background_scroll) % (int)bb.height;
-                float size[] = {bb.width, bb.height};
-                draw_add_rect(pos, size, draw_rgba(1, 1, 1, background_alpha[i]));
-            }
-        }
-        draw_set_tex(NULL);
-    }
+    draw_background(frametime);
     
     {
         draw_set_tex(player_tex);
-        float pos[] = {player_aabb.left, player_aabb.bottom};
-        float size[] = {player_aabb.width, player_aabb.height};
-        draw_add_rect(pos, size, draw_rgb(1, 1, 1));
+        draw_add_aabb(player_aabb, draw_rgb(1, 1, 1));
         
         if (shield_strength != SHIELD_NONE) {
             aabb_t aabb = draw_get_tex_aabb(shield_tex);
@@ -632,6 +454,4 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
     draw_do_effect(passthough_effect);
     
     draw_free_fb(res);
-    
-    background_scroll += frametime * BACKGROUND_SCROLL_SPEED;
 }
