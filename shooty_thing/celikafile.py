@@ -32,5 +32,6 @@ SpaceShooterRedux/PNG/Power-ups/shield_bronze.png \
 SpaceShooterRedux/PNG/Power-ups/shield_silver.png \
 SpaceShooterRedux/PNG/Power-ups/shield_gold.png \
 SpaceShooterRedux/PNG/Effects/shield1.png \
-SpaceShooterRedux/PNG/UI/buttonGreen.png'
+SpaceShooterRedux/PNG/UI/buttonGreen.png \
+SpaceShooterRedux/Bonus/kenvector_future_thin.ttf'
 celika_projname = 'shooty-thing' 

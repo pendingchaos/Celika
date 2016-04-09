@@ -71,9 +71,9 @@ static glyph_t* get_glyph(font_t* font, uint32_t codepoint, size_t height) {
     
     FT_GlyphSlot glyph = face->face->glyph;
     
-    new_glyph.advance = glyph->advance.x / 64.0;
+    new_glyph.advance = (glyph->advance.x / 64.0) - (int)glyph->bitmap.width;
     new_glyph.bearing_x = glyph->bitmap_left;
-    new_glyph.bearing_y = glyph->bitmap_top - glyph->bitmap.rows;
+    new_glyph.bearing_y = glyph->bitmap_top - (int)glyph->bitmap.rows;
     
     size_t w = glyph->bitmap.width;
     size_t h = glyph->bitmap.rows;
@@ -84,7 +84,7 @@ static glyph_t* get_glyph(font_t* font, uint32_t codepoint, size_t height) {
     uint8_t* tex_data = malloc(w*h*4);
     for (size_t y = 0; y < new_glyph.tex_h; y++) {
         for (size_t x = 0; x < new_glyph.tex_w; x++) {
-            uint8_t v = glyph->bitmap.buffer[(y-h-1)*w+x];
+            uint8_t v = glyph->bitmap.buffer[(h-y-1)*glyph->bitmap.pitch+x];
             tex_data[(y*w+x)*4] = 255;
             tex_data[(y*w+x)*4+1] = 255;
             tex_data[(y*w+x)*4+2] = 255;
@@ -142,14 +142,17 @@ void draw_text_font(font_t* font, const uint32_t* text, const float* pos,
                     draw_col_t col, size_t height) {
     float cur_pos[] = {pos[0], pos[1]};
     
+    draw_tex_t* last_tex = draw_get_tex();
+    
     for (const uint32_t* cur = text; *cur; cur++) {
         glyph_t* glyph = get_glyph(font, *cur, height);
         if (!glyph) {
             uint32_t utf32[] = {*cur, 0};
             uint8_t* utf = utf32_to_utf8(utf32);
-            printf("Warning: Rendering unsupported codepoint '%s' (%u)\n",
+            printf("Warning: Unable to get glyph for codepoint '%s' (U+%4x)\n",
                    utf, *cur);
             free(utf);
+            continue;
         }
         
         draw_set_tex(glyph->tex);
@@ -159,8 +162,11 @@ void draw_text_font(font_t* font, const uint32_t* text, const float* pos,
         draw_add_rect(bl, size, col);
         
         uint32_t codepoints[] = {cur==text?0:cur[-1], cur[0], cur[1]};
+        cur_pos[0] += glyph->tex_w;
         cur_pos[0] += get_kerning(font, codepoints, height);
     }
+    
+    draw_set_tex(last_tex);
 }
 
 float draw_text_font_width(font_t* font, const uint32_t* text, size_t height) {
@@ -169,7 +175,7 @@ float draw_text_font_width(font_t* font, const uint32_t* text, size_t height) {
     width += get_kerning(font, codepoints, height);
     
     for (const uint32_t* cur = text+1; *cur; cur++) {
-        width += get_glyph(font, *cur, height)->advance;
+        width += get_glyph(font, *cur, height)->tex_w;
         uint32_t codepoints[] = {cur[-1], cur[0], cur[1]};
         width += get_kerning(font, codepoints, height);
     }

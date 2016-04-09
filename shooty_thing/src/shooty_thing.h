@@ -26,6 +26,7 @@
 #define BG1_TEX "SpaceShooterRedux/Backgrounds/blue.png"
 #define BG2_TEX "SpaceShooterRedux/Backgrounds/darkPurple.png"
 #define BG3_TEX "SpaceShooterRedux/Backgrounds/purple.png"
+#define FONT "SpaceShooterRedux/Bonus/kenvector_future_thin.ttf"
 
 #define LASER0_SOUND "SpaceShooterRedux/Bonus/sfx_laser1.ogg"
 #define LASER1_SOUND "SpaceShooterRedux/Bonus/sfx_laser2.ogg"
@@ -110,4 +111,5 @@ extern sound_t* shield_down_sound;
 extern sound_t* hp_pickup_sound;
 extern sound_t* ammo_pickup_sound;
 extern draw_effect_t* passthough_effect;
+extern font_t* font;
 #endif

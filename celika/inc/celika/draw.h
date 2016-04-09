@@ -29,6 +29,7 @@ aabb_t draw_get_tex_aabb(draw_tex_t* tex);
 draw_effect_t* draw_create_effect(const char* shdr_fname);
 void draw_del_effect(draw_effect_t* effect);
 void draw_set_tex(draw_tex_t* tex);
+draw_tex_t* draw_get_tex();
 void draw_begin(size_t width, size_t height);
 void draw_end();
 void draw_set_orientation(float degrees, float ox, float oy);

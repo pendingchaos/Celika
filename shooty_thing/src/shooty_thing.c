@@ -24,6 +24,7 @@ sound_t* shield_down_sound;
 sound_t* hp_pickup_sound;
 sound_t* ammo_pickup_sound;
 draw_effect_t* passthough_effect;
+font_t* font;
 
 void play_init();
 void play_deinit();
@@ -66,12 +67,16 @@ void celika_game_init(int* w, int* h) {
     
     passthough_effect = draw_create_effect("shaders/passthough.glsl");
     
+    font = create_font(FONT);
+    
     menu = MENU_MAIN;
     play_init();
 }
 
 void celika_game_deinit() {
     play_deinit();
+    
+    del_font(font);
     
     draw_del_effect(passthough_effect);
     

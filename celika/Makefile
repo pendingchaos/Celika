@@ -13,7 +13,8 @@ CELIKA_LDFLAGS = -lGL -lm $(CELIKA_DIR)libcelika.emscripten.$(CELIKA_TARGET).a \
                  $(EMSCRIPTEN)/system/local/lib/libvorbis.a \
                  $(EMSCRIPTEN)/system/local/lib/libogg.a \
                  $(EMSCRIPTEN)/system/local/lib/libSDL2.a \
-		 `freetype-config --libs`
+		 `freetype-config --libs` `libpng-config --libs` \
+		 `pkg-config zlib --libs`
 CELIKA_REL_CFLAGS = -Oz
 else
 CELIKA_LDFLAGS = -lGL -lm $(CELIKA_DIR)libcelika.$(CELIKA_TARGET).a \

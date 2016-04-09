@@ -6,12 +6,10 @@
 #include <stdlib.h>
 
 static int utf8_char_len(uint8_t first) {
-    if ((first&0b10000000) == 0b00000000) return 1;
-    else if ((first&0b11100000) == 0b11000000) return 2;
-    else if ((first&0b11110000) == 0b11100000) return 3;
-    else if ((first&0b11111000) == 0b11110000) return 4;
-    else if ((first&0b11111100) == 0b11111000) return 5;
-    else if ((first&0b11111110) == 0b11111100) return 6;
+    if ((first&0x80) == 0x00) return 1;
+    else if ((first&0xe0) == 0xc0) return 2;
+    else if ((first&0xf0) == 0xe0) return 3;
+    else if ((first&0xf8) == 0xf0) return 4;
     else return -1;
 }
 
@@ -64,30 +62,17 @@ uint32_t* utf8_to_utf32(const uint8_t* utf8) {
         } else if (size == 1) {
             utf32[i] = cur8[0];
         } else if (size == 2) {
-            utf32[i] = (((uint32_t)(cur8[0]&0b00011111))<<6) |
-                       (((uint32_t)(cur8[1]&0b00111111)));
+            utf32[i] = (((uint32_t)(cur8[0]&0x1f))<<6) |
+                       (((uint32_t)(cur8[1]&0x3f)));
         } else if (size == 3) {
-            utf32[i] = (((uint32_t)(cur8[0]&0b00001111))<<12) |
-                       (((uint32_t)(cur8[1]&0b00111111))<<6) |
-                       (((uint32_t)(cur8[2]&0b00111111)));
+            utf32[i] = (((uint32_t)(cur8[0]&0x0f))<<12) |
+                       (((uint32_t)(cur8[1]&0x3f))<<6 ) |
+                       (((uint32_t)(cur8[2]&0x3f)));
         } else if (size == 4) {
-            utf32[i] = (((uint32_t)(cur8[0]&0b00000111))<<18) |
-                       (((uint32_t)(cur8[1]&0b00111111))<<12) |
-                       (((uint32_t)(cur8[2]&0b00111111))<<6) |
-                       (((uint32_t)(cur8[3]&0b00111111)));
-        } else if (size == 5) {
-            utf32[i] = (((uint32_t)(cur8[0]&0b00000011))<<24) |
-                       (((uint32_t)(cur8[1]&0b00111111))<<18) |
-                       (((uint32_t)(cur8[2]&0b00111111))<<12) |
-                       (((uint32_t)(cur8[3]&0b00111111))<<6) |
-                       (((uint32_t)(cur8[4]&0b00111111)));
-        } else if (size == 6) {
-            utf32[i] = (((uint32_t)(cur8[0]&0b00000001))<<30) |
-                       (((uint32_t)(cur8[1]&0b00111111))<<24) |
-                       (((uint32_t)(cur8[2]&0b00111111))<<18) |
-                       (((uint32_t)(cur8[3]&0b00111111))<<12) |
-                       (((uint32_t)(cur8[4]&0b00111111))<<6) |
-                       (((uint32_t)(cur8[5]&0b00111111)));
+            utf32[i] = (((uint32_t)(cur8[0]&0x07))<<18) |
+                       (((uint32_t)(cur8[1]&0x3f))<<12) |
+                       (((uint32_t)(cur8[2]&0x3f))<<6 ) |
+                       (((uint32_t)(cur8[3]&0x3f)));
         }
         
         cur8 += size;
@@ -108,30 +93,17 @@ uint8_t* utf32_to_utf8(const uint32_t* utf32) {
         if (codepoint < 0x80) {
             *cur8++ = codepoint;
         } else if (codepoint < 0x800) {
-            *cur8++ = 0b11000000 | (uint8_t)((codepoint>>6) &0b00011111);
-            *cur8++ = 0b10000000 | (uint8_t) (codepoint     &0b00111111);
+            *cur8++ = 0xc0 | (uint8_t)((codepoint>>6) &0x1f);
+            *cur8++ = 0x80 | (uint8_t) (codepoint     &0x3f);
         } else if (codepoint < 0x10000) {
-            *cur8++ = 0b11100000 | (uint8_t)((codepoint>>12)&0b00001111);
-            *cur8++ = 0b10000000 | (uint8_t)((codepoint>>6) &0b00111111);
-            *cur8++ = 0b10000000 | (uint8_t) (codepoint     &0b00111111);
+            *cur8++ = 0xe0 | (uint8_t)((codepoint>>12)&0x0f);
+            *cur8++ = 0x80 | (uint8_t)((codepoint>>6) &0x3f);
+            *cur8++ = 0x80 | (uint8_t) (codepoint     &0x3f);
         } else if (codepoint < 0x200000) {
-            *cur8++ = 0b11110000 | (uint8_t)((codepoint>>18)&0b00000111);
-            *cur8++ = 0b10000000 | (uint8_t)((codepoint>>12)&0b00111111);
-            *cur8++ = 0b10000000 | (uint8_t)((codepoint>>6) &0b00111111);
-            *cur8++ = 0b10000000 | (uint8_t) (codepoint     &0b00111111);
-        } else if (codepoint < 0x4000000) {
-            *cur8++ = 0b11111000 | (uint8_t)((codepoint>>24)&0b00000011);
-            *cur8++ = 0b10000000 | (uint8_t)((codepoint>>18)&0b00111111);
-            *cur8++ = 0b10000000 | (uint8_t)((codepoint>>12)&0b00111111);
-            *cur8++ = 0b10000000 | (uint8_t)((codepoint>>6) &0b00111111);
-            *cur8++ = 0b10000000 | (uint8_t) (codepoint     &0b00111111);
-        } else if (codepoint < 0x80000000) {
-            *cur8++ = 0b11111100 | (uint8_t)((codepoint>>30)&0b00000001);
-            *cur8++ = 0b10000000 | (uint8_t)((codepoint>>24)&0b00111111);
-            *cur8++ = 0b10000000 | (uint8_t)((codepoint>>18)&0b00111111);
-            *cur8++ = 0b10000000 | (uint8_t)((codepoint>>12)&0b00111111);
-            *cur8++ = 0b10000000 | (uint8_t)((codepoint>>6) &0b00111111);
-            *cur8++ = 0b10000000 | (uint8_t) (codepoint     &0b00111111);
+            *cur8++ = 0xf0 | (uint8_t)((codepoint>>18)&0x07);
+            *cur8++ = 0x80 | (uint8_t)((codepoint>>12)&0x3f);
+            *cur8++ = 0x80 | (uint8_t)((codepoint>>6) &0x3f);
+            *cur8++ = 0x80 | (uint8_t) (codepoint     &0x3f);
         }
     }
     

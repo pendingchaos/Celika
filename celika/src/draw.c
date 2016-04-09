@@ -509,6 +509,10 @@ void draw_set_tex(draw_tex_t* tex) {
     cur_tex = tex;
 }
 
+draw_tex_t* draw_get_tex() {
+    return cur_tex;
+}
+
 void draw_begin(size_t w, size_t h) {
     glViewport(0, 0, w, h);
     width = w;
