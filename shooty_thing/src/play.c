@@ -475,8 +475,8 @@ void play_frame(size_t w, size_t h, float frametime) {
         char text[256];
         snprintf(text, sizeof(text), "Hit: %zu", player_hit);
         uint32_t* utf32 = utf8_to_utf32((uint8_t*)text);
-        float pos[] = {WINDOW_WIDTH-draw_text_font_width(font, utf32, 16), 0};
-        draw_text_font(font, utf32, pos, draw_rgb(0.5, 1, 1), 16);
+        float pos[] = {WINDOW_WIDTH-draw_text_font_width(font, utf32, 10), 2};
+        draw_text_font(font, utf32, pos, draw_rgb(0.5, 1, 1), 10);
         free(utf32);
     }
     
@@ -485,8 +485,8 @@ void play_frame(size_t w, size_t h, float frametime) {
         snprintf(text, sizeof(text), "Accuracy: %.0f%c",
                  player_hit/(double)(player_hit+player_miss)*100, '%');
         uint32_t* utf32 = utf8_to_utf32((uint8_t*)text);
-        float pos[] = {WINDOW_WIDTH-draw_text_font_width(font, utf32, 16), 16};
-        draw_text_font(font, utf32, pos, draw_rgb(0.5, 1, 1), 16);
+        float pos[] = {WINDOW_WIDTH-draw_text_font_width(font, utf32, 10), 14};
+        draw_text_font(font, utf32, pos, draw_rgb(0.5, 1, 1), 10);
         free(utf32);
     }
     
