@@ -10,7 +10,7 @@ static FT_Library ft;
 static const char* error_messages[] = {
     #define FT_NOERRORDEF_(name, num, msg)
     #define FT_ERRORDEF_(name, num, msg) [num] = msg,
-    #include "freetype2/fterrdef.h"
+    #include FT_ERROR_DEFINITIONS_H
     #undef FT_ERRORDEF_
     #undef FT_NOERRORDEF_
     [256] = ""

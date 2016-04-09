@@ -99,6 +99,8 @@ static draw_fb_t create_fb() {
     glGenTextures(1, &res.tex);
     glBindTexture(GL_TEXTURE_2D, res.tex);
     
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     #ifdef __EMSCRIPTEN__
     glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB_ALPHA : GL_RGBA, width, height, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, NULL);
@@ -106,8 +108,6 @@ static draw_fb_t create_fb() {
     glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB8_ALPHA8 : GL_RGBA8, width, height, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     #endif
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     
@@ -273,10 +273,10 @@ void draw_init() {
     }
     
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, BUILTIN_FONT_WIDTH*128,
-                 BUILTIN_FONT_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, BUILTIN_FONT_WIDTH*128,
+                 BUILTIN_FONT_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     glBindTexture(GL_TEXTURE_2D, 0);
     
     builtin_font_tex = malloc(sizeof(draw_tex_t));
@@ -315,8 +315,9 @@ void draw_init() {
     "varying vec2 vfUv;\n"
     "varying vec4 vfCol;\n"
     "uniform sampler2D uTex;\n"
+    "uniform vec2 uTex_dim;\n"
     "vec4 celika_main() {\n"
-    "    return vfCol * TEXTURE2D(uTex, vfUv);\n"
+    "    return vfCol * TEXTURE2D(uTex, ((vfUv*uTex_dim)+vec2(0.5))/uTex_dim);\n"
     "}\n";
     
     batch_program = create_program("batch program", vsource, fsource);
@@ -387,17 +388,17 @@ draw_tex_t* draw_create_tex_data(uint8_t* data, size_t w, size_t h, bool filteri
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     #ifdef __EMSCRIPTEN__
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB_ALPHA : GL_RGBA,
                  w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     #else
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
     glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB8_ALPHA8 : GL_RGBA8,
                  w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     #endif
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     if (!filtering) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -617,6 +618,11 @@ static void draw_batch(batch_t batch) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, batch.tex->id);
         glUniform1i(glGetUniformLocation(program, "uTex"), 0);
+        GLint tex_dim_loc = glGetUniformLocation(program, "uTex_dim");
+        if (tex_dim_loc >= 0) {
+            aabb_t aabb = draw_get_tex_aabb(batch.tex);
+            glUniform2f(tex_dim_loc, aabb.width, aabb.height);
+        }
     }
     
     GLint pos_loc = glGetAttribLocation(program, "aPos");
