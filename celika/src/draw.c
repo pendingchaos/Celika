@@ -373,7 +373,7 @@ draw_tex_t* draw_create_tex(const char* filename, int* w, int* h) {
         }
     }
     
-    draw_tex_t* res = draw_create_tex_data(data, width, height);
+    draw_tex_t* res = draw_create_tex_data(data, width, height, true);
     stbi_image_free(data);
     
     if (w) *w = width;
@@ -382,7 +382,7 @@ draw_tex_t* draw_create_tex(const char* filename, int* w, int* h) {
     return res;
 }
 
-draw_tex_t* draw_create_tex_data(uint8_t* data, size_t w, size_t h) {
+draw_tex_t* draw_create_tex_data(uint8_t* data, size_t w, size_t h, bool filtering) {
     GLuint tex;
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
@@ -398,6 +398,10 @@ draw_tex_t* draw_create_tex_data(uint8_t* data, size_t w, size_t h) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     #endif
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    if (!filtering) {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    }
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     

@@ -21,7 +21,7 @@ typedef struct draw_col_t {
 void draw_init();
 void draw_deinit();
 draw_tex_t* draw_create_tex(const char* filename, int* w, int* h);
-draw_tex_t* draw_create_tex_data(uint8_t* data, size_t w, size_t h);
+draw_tex_t* draw_create_tex_data(uint8_t* data, size_t w, size_t h, bool filtering);
 draw_tex_t* draw_create_scaled_tex(const char* filename, int reqw, int reqh, int* w, int* h);
 draw_tex_t* draw_create_scaled_tex_aabb(const char* filename, int reqw, int reqh, aabb_t* aabb);
 void draw_del_tex(draw_tex_t* tex);

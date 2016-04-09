@@ -91,7 +91,7 @@ static glyph_t* get_glyph(font_t* font, uint32_t codepoint, size_t height) {
             tex_data[(y*w+x)*4+3] = v;
         }
     }
-    new_glyph.tex = draw_create_tex_data(tex_data, w, h);
+    new_glyph.tex = draw_create_tex_data(tex_data, w, h, false);
     free(tex_data);
     
     return list_append(face->glyphs, &new_glyph);
