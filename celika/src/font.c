@@ -84,11 +84,10 @@ static glyph_t* get_glyph(font_t* font, uint32_t codepoint, size_t height) {
     uint8_t* tex_data = malloc(w*h*4);
     for (size_t y = 0; y < new_glyph.tex_h; y++) {
         for (size_t x = 0; x < new_glyph.tex_w; x++) {
-            uint8_t v = glyph->bitmap.buffer[(h-y-1)*glyph->bitmap.pitch+x];
             tex_data[(y*w+x)*4] = 255;
             tex_data[(y*w+x)*4+1] = 255;
             tex_data[(y*w+x)*4+2] = 255;
-            tex_data[(y*w+x)*4+3] = v;
+            tex_data[(y*w+x)*4+3] = glyph->bitmap.buffer[(h-y-1)*glyph->bitmap.pitch+x];
         }
     }
     new_glyph.tex = draw_create_tex_data(tex_data, w, h, false);
@@ -164,16 +163,16 @@ void draw_text_font(font_t* font, const uint32_t* text, const float* pos,
             continue;
         }
         
-        float kern[2];
-        uint32_t codepoints[] = {cur==text?0:cur[-1], cur[0], cur[1]};
-        get_kerning(font, codepoints, height, kern);
-        cur_pos[0] += kern[0];
-        
         draw_set_tex(glyph->tex);
         
         float bl[] = {cur_pos[0]+glyph->bearing_x, cur_pos[1]+glyph->bearing_y};
         float size[] = {glyph->tex_w, glyph->tex_h};
         draw_add_rect(bl, size, col);
+        
+        float kern[2];
+        uint32_t codepoints[] = {cur==text?0:cur[-1], cur[0], cur[1]};
+        get_kerning(font, codepoints, height, kern);
+        cur_pos[0] += kern[0];
         
         cur_pos[0] += glyph->tex_w;
     }

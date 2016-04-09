@@ -297,9 +297,9 @@ void draw_init() {
     "attribute vec2 aUv;\n"
     "varying vec2 vfUv;\n"
     "varying vec4 vfCol;\n"
-    "uniform vec2 uDim;\n"
+    "uniform vec2 uHalfDim;\n"
     "void main() {\n"
-    "    gl_Position = vec4(aPos/uDim*2.0-1.0, 0.0, 1.0);\n"
+    "    gl_Position = vec4((aPos-uHalfDim)/uHalfDim, 0.0, 1.0);\n"
     "    vfUv = aUv;\n"
     "    vfCol = aCol;\n"
     "}\n";
@@ -315,9 +315,10 @@ void draw_init() {
     "varying vec2 vfUv;\n"
     "varying vec4 vfCol;\n"
     "uniform sampler2D uTex;\n"
-    "uniform vec2 uTex_dim;\n"
+    "uniform vec2 uTexDimMinusOne;\n"
     "vec4 celika_main() {\n"
-    "    return vfCol * TEXTURE2D(uTex, ((vfUv*uTex_dim)+vec2(0.5))/uTex_dim);\n"
+    "    vec4 col = TEXTURE2D(uTex, (vfUv*uTexDimMinusOne+vec2(0.315))/uTexDimMinusOne);"
+    "    return vfCol * col;\n"
     "}\n";
     
     batch_program = create_program("batch program", vsource, fsource);
@@ -618,17 +619,17 @@ static void draw_batch(batch_t batch) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, batch.tex->id);
         glUniform1i(glGetUniformLocation(program, "uTex"), 0);
-        GLint tex_dim_loc = glGetUniformLocation(program, "uTex_dim");
+        GLint tex_dim_loc = glGetUniformLocation(program, "uTexDimMinusOne");
         if (tex_dim_loc >= 0) {
             aabb_t aabb = draw_get_tex_aabb(batch.tex);
-            glUniform2f(tex_dim_loc, aabb.width, aabb.height);
+            glUniform2f(tex_dim_loc, aabb.width-1, aabb.height-1);
         }
     }
     
     GLint pos_loc = glGetAttribLocation(program, "aPos");
     GLint col_loc = glGetAttribLocation(program, "aCol");
     GLint uv_loc = glGetAttribLocation(program, "aUv");
-    GLint dim_loc = glGetUniformLocation(program, "uDim");
+    GLint dim_loc = glGetUniformLocation(program, "uHalfDim");
     
     glEnableVertexAttribArray(pos_loc);
     glEnableVertexAttribArray(col_loc);
@@ -648,7 +649,7 @@ static void draw_batch(batch_t batch) {
         glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
     }
     
-    glUniform2f(dim_loc, width, height);
+    glUniform2f(dim_loc, width/2.0, height/2.0);
     
     glDrawArrays(GL_TRIANGLES, 0, batch.vert_count);
     
