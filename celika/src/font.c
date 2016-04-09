@@ -50,7 +50,7 @@ static font_face_t* get_face(font_t* font, size_t height) {
                 font->filename, error_messages[error]);
         exit(1);
     }
-    //FT_Set_Pixel_Sizes(new_face.face, 0, height);
+    
     FT_Set_Char_Size(new_face.face, 0, height*64, 115, 115); //TODO: the dpi might not be correct
     
     new_face.glyphs = list_new(sizeof(glyph_t));
@@ -72,8 +72,6 @@ static glyph_t* get_glyph(font_t* font, uint32_t codepoint, size_t height) {
         return NULL;
     
     FT_GlyphSlot glyph = face->face->glyph;
-    
-    printf("Draw: Real: %d Req: %zu\n", (int)glyph->bitmap.rows, height);
     
     new_glyph.advance = (glyph->advance.x / 64.0) - (int)glyph->bitmap.width;
     new_glyph.bearing_x = glyph->bitmap_left;
