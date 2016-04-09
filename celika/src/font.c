@@ -97,10 +97,19 @@ static glyph_t* get_glyph(font_t* font, uint32_t codepoint, size_t height) {
     return list_append(face->glyphs, &new_glyph);
 }
 
-//TODO
 //chars = {prev, cur, next}
-static float get_kerning(font_t* font, uint32_t* codepoints, size_t height) {
-    return get_glyph(font, codepoints[1], height)->advance;
+static void get_kerning(font_t* font, uint32_t* codepoints, size_t height, float* kern) {
+    font_face_t* face = get_face(font, height);
+    
+    FT_UInt left = codepoints[0] ? FT_Get_Char_Index(face->face, codepoints[0]) : 0;
+    FT_UInt right = codepoints[1] ? FT_Get_Char_Index(face->face, codepoints[1]) : 0;
+    
+    FT_Vector kerning;
+    FT_Get_Kerning(face->face, left, right, FT_KERNING_DEFAULT, &kerning);
+    
+    kern[0] = kerning.x / 64.0;
+    kern[1] = kerning.y / 64.0;
+    kern[0] += get_glyph(font, codepoints[1], height)->advance;
 }
 
 void font_init() {
@@ -155,29 +164,31 @@ void draw_text_font(font_t* font, const uint32_t* text, const float* pos,
             continue;
         }
         
+        float kern[2];
+        uint32_t codepoints[] = {cur==text?0:cur[-1], cur[0], cur[1]};
+        get_kerning(font, codepoints, height, kern);
+        cur_pos[0] += kern[0];
+        
         draw_set_tex(glyph->tex);
         
         float bl[] = {cur_pos[0]+glyph->bearing_x, cur_pos[1]+glyph->bearing_y};
         float size[] = {glyph->tex_w, glyph->tex_h};
         draw_add_rect(bl, size, col);
         
-        uint32_t codepoints[] = {cur==text?0:cur[-1], cur[0], cur[1]};
         cur_pos[0] += glyph->tex_w;
-        cur_pos[0] += get_kerning(font, codepoints, height);
     }
     
     draw_set_tex(last_tex);
 }
 
 float draw_text_font_width(font_t* font, const uint32_t* text, size_t height) {
-    float width = get_glyph(font, text[0], height)->tex_w;
-    uint32_t codepoints[] = {0, text[0], text[1]};
-    width += get_kerning(font, codepoints, height);
-    
-    for (const uint32_t* cur = text+1; *cur; cur++) {
+    float width = 0;
+    for (const uint32_t* cur = text; *cur; cur++) {
         width += get_glyph(font, *cur, height)->tex_w;
-        uint32_t codepoints[] = {cur[-1], cur[0], cur[1]};
-        width += get_kerning(font, codepoints, height);
+        uint32_t codepoints[] = {cur==text ? 0 : cur[-1], cur[0], cur[1]};
+        float kern[2];
+        get_kerning(font, codepoints, height, kern);
+        width += kern[0];
     }
     
     return width;

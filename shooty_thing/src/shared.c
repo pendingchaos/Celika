@@ -40,11 +40,13 @@ bool gui_button(float posy, const char* label) {
     draw_add_aabb(aabb, draw_rgb(brightness, brightness, brightness));
     draw_set_tex(NULL);
     
-    float text_height = aabb.height * BUTTON_TEXT_SIZE;
-    float text_width = draw_text_width(label, text_height);
-    float text_pos[] = {aabb_cx(aabb)-text_width/2, aabb_cy(aabb)-text_height/2};
     uint32_t* utf32 = utf8_to_utf32((uint8_t*)label);
+    
+    float text_height = aabb.height * BUTTON_TEXT_SIZE;
+    float text_width = draw_text_font_width(font, utf32, text_height);
+    float text_pos[] = {aabb_cx(aabb)-text_width/2, aabb_cy(aabb)-text_height/2};
     draw_text_font(font, utf32, text_pos, draw_rgb(0, 0, 0), text_height);
+    
     free(utf32);
     
     return pressed;
