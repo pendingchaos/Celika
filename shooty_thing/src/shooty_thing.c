@@ -8,7 +8,7 @@
 #include <time.h>
 #include <math.h>
 
-state_t state;
+menu_t menu;
 draw_tex_t* background_tex[6];
 draw_tex_t* player_tex;
 draw_tex_t* player_proj_tex;
@@ -25,38 +25,11 @@ sound_t* hp_pickup_sound;
 sound_t* ammo_pickup_sound;
 draw_effect_t* passthough_effect;
 
-void play_state_init();
-void play_state_deinit();
-void play_state_frame(size_t w, size_t h, float frametime);
-void mainmenu_state_init();
-void mainmenu_state_deinit();
-void mainmenu_state_frame(size_t w, size_t h, float frametime);
-
-static void init_state() {
-    switch (state) {
-    case STATE_MAINMENU:
-        mainmenu_state_init();
-        break;
-    case STATE_PLAYING:
-        play_state_init();
-        break;
-    case STATE_LOST:
-        break;
-    }
-}
-
-static void deinit_state() {
-    switch (state) {
-    case STATE_MAINMENU:
-        mainmenu_state_deinit();
-        break;
-    case STATE_PLAYING:
-        play_state_deinit();
-        break;
-    case STATE_LOST:
-        break;
-    }
-}
+void play_init();
+void play_deinit();
+void play_frame(size_t w, size_t h, float frametime);
+void mainmenu_frame(size_t w, size_t h, float frametime);
+void pause_frame(size_t w, size_t h, float frametime);
 
 void celika_game_init(int* w, int* h) {
     *w = WINDOW_WIDTH;
@@ -93,12 +66,12 @@ void celika_game_init(int* w, int* h) {
     
     passthough_effect = draw_create_effect("shaders/passthough.glsl");
     
-    state = STATE_MAINMENU;
-    init_state();
+    menu = MENU_MAIN;
+    play_init();
 }
 
 void celika_game_deinit() {
-    deinit_state();
+    play_deinit();
     
     draw_del_effect(passthough_effect);
     
@@ -125,29 +98,17 @@ void celika_game_deinit() {
 void celika_game_frame(size_t w, size_t h, float frametime) {
     gui_begin_frame(w, h);
     
-    state_t old_state = state;
+    play_frame(w, h, frametime);
     
-    switch (state) {
-    case STATE_MAINMENU: {
-        mainmenu_state_frame(w, h, frametime);
+    switch (menu) {
+    case MENU_NONE:
         break;
-    }
-    case STATE_PLAYING:
-        play_state_frame(w, h, frametime);
+    case MENU_MAIN:
+        mainmenu_frame(w, h, frametime);
         break;
-    case STATE_LOST:
-        state = STATE_PLAYING;
+    case MENU_PAUSE:
+        pause_frame(w, h, frametime);
         break;
-    }
-    
-    if (old_state != state) {
-        state_t new_state = state;
-        
-        state = old_state;
-        deinit_state();
-        
-        state = new_state;
-        init_state();
     }
     
     gui_end_frame();

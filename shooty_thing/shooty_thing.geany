@@ -28,9 +28,12 @@ long_line_behaviour=1
 long_line_column=72
 
 [files]
-current_page=1
-FILE_NAME_0=2774;C;0;EUTF-8;0;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fshooty_thing%2Fconfig.h;0;4
-FILE_NAME_1=253;C;0;EUTF-8;0;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fshooty_thing%2Fshooty_thing.c;0;4
+current_page=4
+FILE_NAME_0=302;Make;0;EUTF-8;2;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fcelika%2FMakefile;0;4
+FILE_NAME_1=1869;C;0;EUTF-8;0;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fcelika%2Finc%2Fcelika%2Fdraw.h;0;4
+FILE_NAME_2=450;C;0;EUTF-8;0;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fcelika%2Finc%2Fcelika%2Flist.h;0;4
+FILE_NAME_3=381;C;0;EUTF-8;0;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fcelika%2Finc%2Fcelika%2Ffont.h;0;4
+FILE_NAME_4=692;C;0;EUTF-8;0;1;0;%2Fhome%2Frugrats%2FDocuments%2FC%2Funnamed_game%2Fcelika%2Fsrc%2Ffont.c;0;4
 
 [VTE]
 last_dir=/home/rugrats

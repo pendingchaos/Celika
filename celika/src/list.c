@@ -31,8 +31,7 @@ void list_free(list_t* list) {
     free(list);
 }
 
-void list_append(list_t* list, void* val) {
-    //list_insert(list, list_len(list)-1, val);
+void* list_append(list_t* list, void* val) {
     list_head_t* new = malloc(sizeof(list_head_t)+list->val_size);
     new->list = list;
     new->next = NULL;
@@ -47,9 +46,11 @@ void list_append(list_t* list, void* val) {
         new->prev = NULL;
         list->first = new;
     }
+    
+    return new+1;
 }
 
-void list_insert(list_t* list, size_t before, void* val) {
+void* list_insert(list_t* list, size_t before, void* val) {
     list_head_t* new = malloc(sizeof(list_head_t)+list->val_size);
     new->list = list;
     memcpy(new+1, val, list->val_size);
@@ -68,6 +69,8 @@ void list_insert(list_t* list, size_t before, void* val) {
         new->prev = new->next = NULL;
         list->first = new;
     }
+    
+    return new+1;
 }
 
 void list_remove(void* item) {

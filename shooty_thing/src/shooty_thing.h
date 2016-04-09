@@ -79,11 +79,11 @@
 #define BUTTON_PADDING 10
 #define BUTTON_TEXT_SIZE 0.75
 
-typedef enum state_t {
-    STATE_MAINMENU,
-    STATE_PLAYING,
-    STATE_LOST
-} state_t;
+typedef enum meun_t {
+    MENU_NONE,
+    MENU_MAIN,
+    MENU_PAUSE
+} menu_t;
 
 typedef enum collectable_type_t {
     COLLECT_TYPE_AMMO,
@@ -94,7 +94,7 @@ typedef enum collectable_type_t {
     COLLECT_TYPE_MAX
 } collectable_type_t;
 
-extern state_t state;
+extern menu_t menu;
 extern draw_tex_t* background_tex[6];
 extern draw_tex_t* player_tex;
 extern draw_tex_t* player_proj_tex;

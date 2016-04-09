@@ -373,32 +373,37 @@ draw_tex_t* draw_create_tex(const char* filename, int* w, int* h) {
         }
     }
     
+    draw_tex_t* res = draw_create_tex_data(data, width, height);
+    stbi_image_free(data);
+    
+    if (w) *w = width;
+    if (h) *h = height;
+    
+    return res;
+}
+
+draw_tex_t* draw_create_tex_data(uint8_t* data, size_t w, size_t h) {
     GLuint tex;
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     #ifdef __EMSCRIPTEN__
     glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB_ALPHA : GL_RGBA,
-                 width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+                 w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     #else
     glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
     glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB8_ALPHA8 : GL_RGBA8,
-                 width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+                 w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     #endif
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     
-    stbi_image_free(data);
-    
-    if (w) *w = width;
-    if (h) *h = height;
-    
     draw_tex_t* res = malloc(sizeof(draw_tex_t));
     res->id = tex;
-    res->aabb = create_aabb_lbwh(0, 0, width, height);
+    res->aabb = create_aabb_lbwh(0, 0, w, h);
     
     return res;
 }
@@ -529,7 +534,7 @@ void draw_set_scale(float x, float y, float ox, float oy) {
     scale_origin_y = oy;
 }
 
-void draw_add_tri(float* tpos, draw_col_t* tcol, float* tuv) {
+void draw_add_tri(const float* tpos, const draw_col_t* tcol, const float* tuv) {
     float new_tpos[6];
     float o1x = scale_origin_x - orientation_origin_x;
     float o1y = scale_origin_y - orientation_origin_y;
@@ -556,7 +561,7 @@ void draw_add_tri(float* tpos, draw_col_t* tcol, float* tuv) {
     vert_count += 3;
 }
 
-void draw_add_quad(float* qpos, draw_col_t* qcol, float* quv) {
+void draw_add_quad(const float* qpos, const draw_col_t* qcol, const float* quv) {
     float tri1_pos[] = {qpos[0*2+0], qpos[0*2+1],
                         qpos[1*2+0], qpos[1*2+1],
                         qpos[2*2+0], qpos[2*2+1]};
@@ -576,7 +581,7 @@ void draw_add_quad(float* qpos, draw_col_t* qcol, float* quv) {
     draw_add_tri(tri2_pos, tri2_col, tri2_uv);
 }
 
-void draw_add_rect(float* bl, float* size, draw_col_t col) {
+void draw_add_rect(const float* bl, const float* size, const draw_col_t col) {
     float qpos[] = {bl[0], bl[1], bl[0]+size[0], bl[1],
                     bl[0]+size[0], bl[1]+size[1], bl[0], bl[1]+size[1]};
     draw_col_t qcol[] = {col, col, col, col};
@@ -770,7 +775,7 @@ void draw_free_fb(draw_fb_t* fb) {
     rel_fb(fb);
 }
 
-void draw_text(const char* text, float* pos, draw_col_t col, float height) {
+void draw_text(const char* text, const float* pos, draw_col_t col, float height) {
     float scale = height / BUILTIN_FONT_HEIGHT;
     float width = BUILTIN_FONT_WIDTH * scale;
     

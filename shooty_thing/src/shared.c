@@ -6,7 +6,6 @@
 static Uint32 mouse_state = 0;
 static Uint32 last_mouse_state = 0;
 static size_t w, h;
-static float background_scroll = 0;
 
 void gui_begin_frame(size_t w_, size_t h_) {
     mouse_state = SDL_GetMouseState(NULL, NULL);
@@ -47,28 +46,4 @@ bool gui_button(float posy, const char* label) {
     draw_text(label, text_pos, draw_rgb(0, 0, 0), text_height);
     
     return pressed;
-}
-
-void draw_background(float frametime) {
-    float time = background_scroll / (double)BACKGROUND_SCROLL_SPEED;
-    time *= BACKGROUND_CHANGE_SPEED;
-    draw_tex_t* background_textures[] = {background_tex[(int)floor(time) % 6],
-                                         background_tex[(int)ceil(time) % 6]};
-    float background_alpha[] = {1, time-floor(time)};
-    for (size_t i = 0; i < 2; i++) {
-        draw_tex_t* tex = background_textures[i];
-        draw_set_tex(tex);
-        aabb_t bb = draw_get_tex_aabb(tex);
-        for (size_t x = 0; x < ceil(w/bb.width); x++) {
-            for (size_t y = 0; y < ceil(h/bb.height)+1; y++) {
-                float pos[] = {x*bb.width, y*bb.height};
-                pos[1] -= ((int)background_scroll) % (int)bb.height;
-                float size[] = {bb.width, bb.height};
-                draw_add_rect(pos, size, draw_rgba(1, 1, 1, background_alpha[i]));
-            }
-        }
-        draw_set_tex(NULL);
-    }
-    
-    background_scroll += frametime * BACKGROUND_SCROLL_SPEED;
 }

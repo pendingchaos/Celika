@@ -6,6 +6,7 @@
 #include <SDL2/SDL_mouse.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <assert.h>
 #include <time.h>
 #include <math.h>
 
@@ -39,6 +40,8 @@ static const float shield_reduce[] = {
     [SHIELD_STRONG] = 0.9
 };
 
+static float background_scroll = 0;
+
 static aabb_t player_aabb;
 static float player_fire_timeout;
 static float player_hp;
@@ -52,6 +55,10 @@ static list_t* player_proj; //list of aabb_t
 static list_t* enemy_proj; //list of aabb_t
 static list_t* enemies; //list of enemy_t
 static list_t* collectables[COLLECT_TYPE_MAX]; //list of collectable_t
+
+static menu_t last_menu = MENU_MAIN;
+static int last_mouse_x = WINDOW_WIDTH / 2;
+static int last_mouse_y = WINDOW_HEIGHT / 2;
 
 static float req_enemy_count;
 
@@ -106,8 +113,14 @@ static void create_collectable(collectable_type_t type) {
 }
 
 static void update_player(float frametime) {
+    if (last_menu != menu && menu==MENU_NONE)
+        SDL_WarpMouseInWindow(celika_window, last_mouse_x, last_mouse_y);
+    
     int mx, my;
     bool fire = SDL_GetMouseState(&mx, &my) & SDL_BUTTON_LMASK;
+    
+    last_mouse_x = mx;
+    last_mouse_y = my;
     
     player_aabb.left = mx - player_aabb.width/2;
     player_aabb.bottom = WINDOW_HEIGHT - my;
@@ -268,11 +281,17 @@ static void update_collectables(float frametime) {
                     shield_timeleft = SHIELD_TIMEOUT;
                     audio_play_sound(shield_up_sound, 1, 0, true);
                     break;
+                case COLLECT_TYPE_MAX:
+                    assert(false);
+                    break;
                 }
             }
         }
     }
 }
+
+static void setup_state();
+static void cleanup_state();
 
 static void update(float frametime) {
     update_player(frametime);
@@ -307,7 +326,8 @@ static void update(float frametime) {
         create_collectable(COLLECT_TYPE_SHIELD2);
     
     if (player_hp <= 0) {
-        state = STATE_LOST;
+        cleanup_state();
+        setup_state();
         audio_play_sound(lose_sound, 1, 0, true);
     }
     
@@ -330,8 +350,6 @@ static void setup_state() {
     enemies = list_new(sizeof(enemy_t));
     for (size_t i = 0; i < COLLECT_TYPE_MAX; i++)
         collectables[i] = list_new(sizeof(collectable_t));
-    
-    state = STATE_PLAYING;
 }
 
 static void cleanup_state() {
@@ -342,7 +360,7 @@ static void cleanup_state() {
     list_free(player_proj);
 }
 
-void play_state_init() {
+void play_init() {
     srand(time(NULL));
     
     player_aabb = draw_get_tex_aabb(player_tex);
@@ -350,19 +368,39 @@ void play_state_init() {
     setup_state();
 }
 
-void play_state_deinit() {
+void play_deinit() {
     cleanup_state();
 }
 
-void play_state_frame(size_t w, size_t h, float frametime) {
-    if (state == STATE_PLAYING)
-        update(frametime);
-    else if (state == STATE_LOST) {
-        cleanup_state();
-        setup_state();
+void play_frame(size_t w, size_t h, float frametime) {
+    if (menu == MENU_NONE) update(frametime);
+    
+    if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_ESCAPE] && menu==MENU_NONE)
+        menu = MENU_PAUSE;
+    if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_PAUSE] && menu==MENU_NONE)
+        menu = MENU_PAUSE;
+    
+    float time = background_scroll / (double)BACKGROUND_SCROLL_SPEED;
+    time *= BACKGROUND_CHANGE_SPEED;
+    draw_tex_t* background_textures[] = {background_tex[(int)floor(time) % 6],
+                                         background_tex[(int)ceil(time) % 6]};
+    float background_alpha[] = {1, time-floor(time)};
+    for (size_t i = 0; i < 2; i++) {
+        draw_tex_t* tex = background_textures[i];
+        draw_set_tex(tex);
+        aabb_t bb = draw_get_tex_aabb(tex);
+        for (size_t x = 0; x < ceil(w/bb.width); x++) {
+            for (size_t y = 0; y < ceil(h/bb.height)+1; y++) {
+                float pos[] = {x*bb.width, y*bb.height};
+                pos[1] -= ((int)background_scroll) % (int)bb.height;
+                float size[] = {bb.width, bb.height};
+                draw_add_rect(pos, size, draw_rgba(1, 1, 1, background_alpha[i]));
+            }
+        }
+        draw_set_tex(NULL);
     }
     
-    draw_background(frametime);
+    background_scroll += frametime * BACKGROUND_SCROLL_SPEED;
     
     {
         draw_set_tex(player_tex);
@@ -454,4 +492,6 @@ void play_state_frame(size_t w, size_t h, float frametime) {
     draw_do_effect(passthough_effect);
     
     draw_free_fb(res);
+    
+    last_menu = menu;
 }
