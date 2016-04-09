@@ -4,7 +4,7 @@ font_t* font;
 
 void celika_game_init(int* w, int* h) {
     *w = *h = 500;
-    font = create_font("OstrichSans-Medium.otf");
+    font = create_font("OstrichSans/OstrichSans-Medium.otf");
 }
 
 void celika_game_frame(size_t w, size_t h, float frametime) {
