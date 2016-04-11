@@ -57,6 +57,6 @@ libcelika$(CELIKA_EM).$(CELIKA_TARGET).a: $(celika_obj)
 .%.celika$(CELIKA_EM).release.o: %.c Makefile
 	@$(CC) -c $(CELIKA_INTERNAL_CFLAGS) $< -o $@ $(CELIKA_REL_CFLAGS)
 
-.PHONY: clean
+.PHONY: celika_clean
 celika_clean:
 	@rm -f $(celika_dep) $(celika_obj) $(CELIKA_DIR)libcelika.$(CELIKA_TARGET)$(CELIKA_EM).a

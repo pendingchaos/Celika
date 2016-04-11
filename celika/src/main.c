@@ -39,6 +39,8 @@ static void frame() {
     
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        celika_game_event(event);
+        
         switch (event.type) {
         case SDL_QUIT:
             running = false;
@@ -58,9 +60,18 @@ static void frame() {
     frametime = (start-last_frame_start) / (double)SDL_GetPerformanceFrequency();
     last_frame_start = start;
     
+    static float frametimes[64];
+    static size_t next_frametime;
+    frametimes[next_frametime] = frametime;
+    next_frametime = (next_frametime+1) % 64;
+    
+    float max_frametime = frametimes[0];
+    for (size_t i = 1; i < 64; i++)
+        max_frametime = fmax(max_frametime, frametimes[i]);
+    
     char title[256];
     static const char* fmt = "%s - %.0f mspf - %.0f fps";
-    snprintf(title, sizeof(title), fmt, "Celika", frametime*1000, 1/frametime);
+    snprintf(title, sizeof(title), fmt, "Celika", max_frametime*1000, 1/max_frametime);
     
     SDL_SetWindowTitle(celika_window, title);
     

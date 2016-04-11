@@ -51,7 +51,7 @@ static font_face_t* get_face(font_t* font, size_t height) {
         exit(1);
     }
     
-    FT_Set_Char_Size(new_face.face, 0, height*64, 115, 115); //TODO: the dpi might not be correct
+    FT_Set_Char_Size(new_face.face, 0, height*64, 96, 96); //TODO: the dpi might not be correct
     
     new_face.glyphs = list_new(sizeof(glyph_t));
     return list_append(font->faces, &new_face);
@@ -146,6 +146,31 @@ void del_font(font_t* font) {
     
     list_free(font->faces);
     free(font);
+}
+
+float font_get_advance(font_t* font, size_t height, uint32_t prev, uint32_t codepoint) {
+    glyph_t* glyph = get_glyph(font, codepoint, height);
+    
+    float kern[2];
+    uint32_t codepoints[] = {prev, codepoint, 0};
+    get_kerning(font, codepoints, height, kern);
+    
+    return glyph->tex_w + kern[0];
+}
+
+float font_get_bearing_x(font_t* font, size_t height, uint32_t codepoint) {
+    return get_glyph(font, codepoint, height)->bearing_x;
+}
+
+float font_get_width(font_t* font, size_t height, uint32_t codepoint) {
+    return get_glyph(font, codepoint, height)->tex_w;
+}
+
+float font_get_kerning_x(font_t* font, size_t height, uint32_t prev, uint32_t codepoint) {
+    float kern[2];
+    uint32_t codepoints[] = {prev, codepoint, 0};
+    get_kerning(font, codepoints, height, kern);
+    return kern[0];
 }
 
 void draw_text_font(font_t* font, const uint32_t* text, const float* pos,

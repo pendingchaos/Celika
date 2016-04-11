@@ -372,13 +372,29 @@ void play_deinit() {
     cleanup_state();
 }
 
+void play_event(SDL_Event event) {
+    switch (event.type) {
+    case SDL_KEYUP: {
+        if (event.key.keysym.sym==SDLK_ESCAPE ||
+            event.key.keysym.sym==SDLK_PAUSE) {
+            switch (menu) {
+            case MENU_NONE:
+                menu = MENU_PAUSE;
+                break;
+            case MENU_PAUSE:
+                menu = MENU_NONE;
+                break;
+            case MENU_MAIN:
+                break;
+            }
+        }
+        break;
+    }
+    }
+}
+
 void play_frame(size_t w, size_t h, float frametime) {
     if (menu == MENU_NONE) update(frametime);
-    
-    if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_ESCAPE] && menu==MENU_NONE)
-        menu = MENU_PAUSE;
-    if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_PAUSE] && menu==MENU_NONE)
-        menu = MENU_PAUSE;
     
     float time = background_scroll / (double)BACKGROUND_SCROLL_SPEED;
     time *= BACKGROUND_CHANGE_SPEED;

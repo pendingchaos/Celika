@@ -28,6 +28,7 @@ font_t* font;
 
 void play_init();
 void play_deinit();
+void play_event(SDL_Event event);
 void play_frame(size_t w, size_t h, float frametime);
 void mainmenu_frame(size_t w, size_t h, float frametime);
 void pause_frame(size_t w, size_t h, float frametime);
@@ -98,6 +99,10 @@ void celika_game_deinit() {
     for (size_t i = 0; i < ENEMY_TEX_COUNT; i++)
         draw_del_tex(enemy_tex[i]);
     draw_del_tex(player_tex);
+}
+
+void celika_game_event(SDL_Event event) {
+    play_event(event);
 }
 
 void celika_game_frame(size_t w, size_t h, float frametime) {

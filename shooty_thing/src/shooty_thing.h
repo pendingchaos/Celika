@@ -78,7 +78,7 @@
 #define SHIELD_TIMEOUT 10
 
 #define BUTTON_PADDING 10
-#define BUTTON_TEXT_SIZE 0.75
+#define BUTTON_TEXT_SIZE 0.6
 
 typedef enum meun_t {
     MENU_NONE,

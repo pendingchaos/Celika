@@ -1,3 +1,4 @@
+#include "textedit.h"
 #include "aabb.h"
 #include "audio.h"
 #include "draw.h"

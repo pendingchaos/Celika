@@ -190,6 +190,10 @@ void celika_game_deinit() {
     free_state();
 }
 
+void celika_game_event(SDL_Event event) {
+    
+}
+
 void celika_game_frame(size_t w, size_t h, float frametime) {
     draw_add_aabb(create_aabb_lbwh(0, 0, w, h), draw_rgb(0.5, 0.5, 1));
     
