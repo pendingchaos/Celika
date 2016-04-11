@@ -210,6 +210,11 @@ void textedit_event(textedit_t* edit, float left, float bottom, SDL_Event event)
         break;
     }
     }
+    
+    if (false) {
+        stb_textedit_cut(&edit->str, &edit->state);
+        stb_textedit_paste(&edit->str, &edit->state, NULL, 0);
+    }
 }
 
 void textedit_draw(textedit_t* edit, textedit_draw_callbacks_t callbacks) {

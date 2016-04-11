@@ -16,16 +16,20 @@ celika_src = []
 celika_embedded_files = ''
 celika_projname = None
 
+def confirm_overwrite_thing(s):
+    print 'Overwrite %s?' % s
+    while True:
+        c = raw_input('y/n: ')
+        if c.lower() == 'y':
+            return True
+        elif c.lower() == 'n':
+            return False
+
 def overwrite_thing(f):
     try:
         open(f, 'r')
-        print 'Overwrite %s?' % os.path.abspath(f)
-        while True:
-            c = raw_input('y/n: ')
-            if c.lower() == 'y':
-                return
-            elif c.lower() == 'n':
-                sys.exit()
+        if not confirm_overwrite_thing(os.path.abspath(f)):
+            sys.exit()
     except IOError:
         pass
 
@@ -163,11 +167,12 @@ if len(sys.argv) == 1:
     print 'Usage:'
     print '%s gen   [file=celikafile.py]   Generates stuff' % sys.argv[0]
     print '%s clean [file=celikafile.py]   Cleans stuff up' % sys.argv[0]
+    print '%s setup project-name           Initialize git, create celikafile.py and main.c and generate stuff'
     sys.exit()
 
-celikafile = sys.argv[2] if len(sys.argv)==3 else 'celikafile.py'
-
-exec open(celikafile).read()
+if sys.argv[1] in ['gen', 'clean']:
+    celikafile = sys.argv[2] if len(sys.argv)==3 else 'celikafile.py'
+    exec open(celikafile).read()
 
 if sys.argv[1] == 'gen':
     celika_gen(celikafile)
@@ -187,3 +192,46 @@ elif sys.argv[1] == 'clean':
     
     try: os.remove('%s.html' % celika_projname)
     except OSError: pass
+elif sys.argv[1] == 'setup':
+    if os.path.exists('.git'):
+        init_git = confirm_overwrite_thing('git repository')
+    else:
+        init_git = True
+    
+    if os.path.exists('celikafile.py'):
+        init_celikafile = confirm_overwrite_thing(os.path.abspath('celikafile.py'))
+    else:
+        init_celikafile = True
+    
+    if os.path.exists('main.c'):
+        init_main = confirm_overwrite_thing(os.path.abspath('main.c'))
+    else:
+        init_main = True
+    
+    if init_git:
+        os.system('git init')
+    
+    if init_celikafile:
+        open('celikafile.py', 'w').write('''celika_src = '$(wildcard *.c)'
+celika_projname = '%s'
+''' % sys.argv[2])
+    
+    if init_main:
+        open('main.c', 'w').write('''#include "celika/celika.h"
+
+void celika_game_init(int* w, int* h) {
+    *w = *h = 500;
+}
+
+void celika_game_deinit() {
+}
+
+void celika_game_event(SDL_Event event) {
+}
+
+void celika_game_frame(size_t w, size_t h, float frametime) {
+    draw_add_aabb(create_aabb_lbwh(0, 0, w, h), draw_rgb(1, 1, 1));
+}
+''')
+    
+    os.system('%s gen' % sys.argv[0])
