@@ -95,8 +95,6 @@ void audio_init(size_t freq, size_t sample_buf_size) {
         fprintf(stderr, "Failed to open audio device: %s", SDL_GetError());
         exit(EXIT_FAILURE);
     }
-    
-    SDL_PauseAudioDevice(dev, 0);
 }
 
 void audio_deinit() {
@@ -105,6 +103,8 @@ void audio_deinit() {
 }
 
 sound_t* audio_create_sound(const char* filename) {
+    SDL_PauseAudioDevice(dev, 0);
+    
     sound_t* sound = malloc(sizeof(sound_t));
     sound->ref_count = 1;
     

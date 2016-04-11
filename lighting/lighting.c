@@ -57,17 +57,23 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
     light_x = mx;
     light_y = 500 - my;
     
-    srand(5);
-    for (size_t i = 0; i < 5; i++)
-        draw_shadow(create_aabb_ce(rand()%500, rand()%500, 20, 20),
-                    100000, draw_rgb(0.0, 0.0, 0.0));
+    #define BOX_SHADOW(x, y) draw_shadow(create_aabb_ce(x, y, 20, 20),\
+                                         100000, draw_rgb(0.0, 0.0, 0.0));
+    BOX_SHADOW(265, 175)
+    BOX_SHADOW(72, 110)
+    BOX_SHADOW(132, 276)
+    BOX_SHADOW(149, 420)
+    BOX_SHADOW(381, 73)
+    #undef BOX_SHADOW
     
-    draw_prims();
-    
-    srand(5);
-    for (size_t i = 0; i < 5; i++)
-        draw_add_aabb(create_aabb_ce(rand()%500, rand()%500, 20, 20),
-                      draw_rgb(1, 0.5, 0.5));
+    #define BOX(x, y)  draw_add_aabb(create_aabb_ce(x, y, 20, 20),\
+                                     draw_rgb(1, 0.5, 0.5));
+    BOX(265, 175)
+    BOX(72, 110)
+    BOX(132, 276)
+    BOX(149, 420)
+    BOX(381, 73)
+    #undef BOX
     
     aabb_t light_aabb = create_aabb_ce(light_x, light_y, light_radius, light_radius);
     draw_set_blend(BLEND_MULT);
