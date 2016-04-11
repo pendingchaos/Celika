@@ -7,6 +7,14 @@
 #include <stdint.h>
 #include <stddef.h>
 
+typedef enum blend_t {
+    BLEND_NONE,
+    BLEND_ALPHA,
+    BLEND_ADD,
+    BLEND_SUB,
+    BLEND_MULT
+} blend_t;
+
 typedef struct draw_tex_t draw_tex_t;
 typedef struct draw_effect_t draw_effect_t;
 typedef struct draw_fb_t draw_fb_t;
@@ -30,6 +38,8 @@ draw_effect_t* draw_create_effect(const char* shdr_fname);
 void draw_del_effect(draw_effect_t* effect);
 void draw_set_tex(draw_tex_t* tex);
 draw_tex_t* draw_get_tex();
+void draw_set_blend(blend_t blend);
+blend_t draw_get_blend();
 void draw_begin(size_t width, size_t height);
 void draw_end();
 void draw_set_orientation(float degrees, float ox, float oy);

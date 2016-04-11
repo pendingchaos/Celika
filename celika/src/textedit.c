@@ -70,7 +70,9 @@ void get_row_layout(StbTexteditRow* row, textedit_str_t* obj, int n) {
                                    obj->textedit->height);
     row->baseline_y_delta = obj->textedit->height;
     row->ymin = line*obj->textedit->height;
-    row->ymax = row->ymin - obj->textedit->height;
+    //TODO: For some reason adding '(int)' fixes a bug where
+    //when you click on the text it does not move the cursor
+    row->ymax = (int)row->ymin - obj->textedit->height;
     row->num_chars = num_codepoints + 1;
     
     codepoints[num_codepoints] = last;
@@ -144,7 +146,7 @@ void textedit_event(textedit_t* edit, float left, float bottom, SDL_Event event)
                          y>aabb.bottom && y<aabb_top(aabb);
         if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button==SDL_BUTTON_LEFT && intersect)
             stb_textedit_click(&edit->str, &edit->state,
-                               event.button.x-aabb.left,y-aabb.bottom);
+                               event.button.x-aabb.left, y-aabb.bottom);
         else if (event.type == SDL_MOUSEMOTION && event.motion.state&SDL_BUTTON_LMASK && intersect)
             stb_textedit_drag(&edit->str, &edit->state, x, y);
         break;

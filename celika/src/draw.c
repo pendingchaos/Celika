@@ -56,6 +56,7 @@ typedef struct fb_pool_t {
 typedef struct batch_t {
     draw_tex_t* tex;
     size_t vert_count;
+    blend_t blend;
     float* pos;
     float* col;
     float* uv;
@@ -66,6 +67,7 @@ static bool lin_texture_read;
 static bool lin_texture_write;
 static bool lin_fb_write;
 static draw_tex_t* cur_tex = 0;
+static blend_t cur_blend = BLEND_ALPHA;
 static size_t vert_count = 0;
 static float* pos = NULL;
 static float* col = NULL;
@@ -250,9 +252,6 @@ void draw_init() {
     glGenBuffers(1, &pos_buf);
     glGenBuffers(1, &col_buf);
     glGenBuffers(1, &uv_buf);
-    
-    glEnable(GL_BLEND);
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     
     GLuint font_tex_id;
     glGenTextures(1, &font_tex_id);
@@ -495,11 +494,11 @@ void draw_del_effect(draw_effect_t* effect) {
     free(effect);
 }
 
-void draw_set_tex(draw_tex_t* tex) {
-    if (tex == cur_tex) return;
+static void submit_batch() {
     if (vert_count) {
         batch_t batch;
         batch.tex = cur_tex;
+        batch.blend = cur_blend;
         batch.vert_count = vert_count;
         batch.pos = pos;
         batch.col = col;
@@ -511,12 +510,22 @@ void draw_set_tex(draw_tex_t* tex) {
         col = NULL;
         uv = NULL;
     }
-    
+}
+
+void draw_set_tex(draw_tex_t* tex) {
+    if (tex == cur_tex) return;
+    submit_batch();
     cur_tex = tex;
 }
 
 draw_tex_t* draw_get_tex() {
     return cur_tex;
+}
+
+void draw_set_blend(blend_t blend) {
+    if (blend == cur_blend) return;
+    submit_batch();
+    cur_blend = blend;
 }
 
 void draw_begin(size_t w, size_t h) {
@@ -610,6 +619,32 @@ static bool framebuffer_bound = false;
 static void draw_batch(batch_t batch) {
     if (!batch.vert_count) return;
     
+    switch (batch.blend) {
+    case BLEND_NONE:
+        glDisable(GL_BLEND);
+        break;
+    case BLEND_ALPHA:
+        glEnable(GL_BLEND);
+        glBlendEquation(GL_FUNC_ADD);
+        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        break;
+    case BLEND_ADD:
+        glEnable(GL_BLEND);
+        glBlendEquation(GL_FUNC_ADD);
+        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE, GL_ONE, GL_ONE);
+        break;
+    case BLEND_SUB:
+        glEnable(GL_BLEND);
+        glBlendEquation(GL_FUNC_SUBTRACT);
+        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE, GL_ONE, GL_ONE);
+        break;
+    case BLEND_MULT:
+        glEnable(GL_BLEND);
+        glBlendEquation(GL_FUNC_ADD);
+        glBlendFuncSeparate(GL_DST_COLOR, GL_ZERO, GL_DST_ALPHA, GL_ZERO);
+        break;
+    }
+    
     bool output_lin = framebuffer_bound ? lin_texture_write : lin_fb_write;
     GLint program = output_lin ? (batch.tex ? batch_program_tex.program_lin : batch_program.program_lin)
                                : (batch.tex ? batch_program_tex.program_srgb : batch_program.program_srgb);
@@ -666,6 +701,7 @@ void draw_prims() {
     
     batch_t batch;
     batch.tex = cur_tex;
+    batch.blend = cur_blend;
     batch.vert_count = vert_count;
     batch.pos = pos;
     batch.col = col;

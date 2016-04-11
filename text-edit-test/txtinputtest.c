@@ -37,11 +37,11 @@ void celika_game_deinit() {
 }
 
 void celika_game_event(SDL_Event event) {
-    textedit_event(edit, 0, 0, event);
+    textedit_event(edit, 0, bottom, event);
+    bottom = 500 - textedit_calc_aabb(edit, 0, 0).height;
 }
 
 void celika_game_frame(size_t w, size_t h, float frametime) {
-    bottom = 500 - textedit_calc_aabb(edit, 0, 0).height;
     draw_add_aabb(create_aabb_lbwh(0, 0, w, h), draw_rgb(1, 1, 1));
     draw_add_aabb(textedit_calc_aabb(edit, 0, bottom), draw_rgb(0.7, 0.7, 0.7));
     textedit_draw_callbacks_t callbacks;
