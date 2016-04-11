@@ -619,27 +619,24 @@ static bool framebuffer_bound = false;
 static void draw_batch(batch_t batch) {
     if (!batch.vert_count) return;
     
+    if (batch.blend == BLEND_NONE) glDisable(GL_BLEND);
+    else glEnable(GL_BLEND);
     switch (batch.blend) {
     case BLEND_NONE:
-        glDisable(GL_BLEND);
         break;
     case BLEND_ALPHA:
-        glEnable(GL_BLEND);
         glBlendEquation(GL_FUNC_ADD);
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         break;
     case BLEND_ADD:
-        glEnable(GL_BLEND);
         glBlendEquation(GL_FUNC_ADD);
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE, GL_ONE, GL_ONE);
         break;
     case BLEND_SUB:
-        glEnable(GL_BLEND);
         glBlendEquation(GL_FUNC_SUBTRACT);
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE, GL_ONE, GL_ONE);
         break;
     case BLEND_MULT:
-        glEnable(GL_BLEND);
         glBlendEquation(GL_FUNC_ADD);
         glBlendFuncSeparate(GL_DST_COLOR, GL_ZERO, GL_DST_ALPHA, GL_ZERO);
         break;
