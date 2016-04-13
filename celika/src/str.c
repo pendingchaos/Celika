@@ -4,6 +4,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 static int utf8_char_len(uint8_t first) {
     if ((first&0x80) == 0x00) return 1;
@@ -115,4 +116,77 @@ bool utf8_is_ascii(const uint8_t* str) {
     for (const uint8_t* c = str; *c; c++)
         if (*c > 127) return false;
     return true;
+}
+
+//TODO: This is far from complete
+int utf32_vformat(uint32_t* dest, size_t dest_count, const uint32_t* fmt, va_list list) {
+    #define ADD(len_, s_) do {\
+        const size_t add_len = (len_);\
+        const uint32_t* add_s = (s_);\
+        if (left >= add_len) {\
+            memcpy(dest, add_s, add_len*4);\
+            dest += add_len;\
+            left -= add_len;\
+        } else {\
+            memcpy(dest, add_s, left*4);\
+        }\
+        needed += add_len;\
+    } while (0)
+    
+    size_t needed = 0;
+    size_t left = dest_count;
+    while (*fmt) {
+        if (*fmt == '%') {
+            fmt++;
+            if (*fmt=='s') {
+                uint32_t* s = va_arg(list, uint32_t*);
+                ADD(utf32_len(s), s);
+                fmt++;
+            } else if (*fmt == 'f') {
+                uint32_t* s = utf32_format_double(va_arg(list, double));
+                ADD(utf32_len(s), s);
+                free(s);
+                fmt++;
+            } else if (*fmt == 'd') {
+                uint32_t* s = utf32_format_int(va_arg(list, int));
+                ADD(utf32_len(s), s);
+                free(s);
+                fmt++;
+            }
+        } else {
+            ADD(1, fmt++);
+        }
+    }
+    
+    #undef ADD
+    
+    if (left) *dest = 0;
+    
+    return needed;
+}
+
+int utf32_format(uint32_t* dest, size_t dest_count, const uint32_t* fmt, ...) {
+    va_list list;
+    va_start(list, fmt);
+    int res = utf32_format(dest, dest_count, fmt, list);
+    va_end(list);
+    return res;
+}
+
+uint32_t* utf32_format_double(double val) {
+    size_t len = snprintf(NULL, 0, "%f", val);
+    uint8_t* utf8 = malloc(len+1);
+    snprintf((char*)utf8, len, "%f", val);
+    uint32_t* utf32 = utf8_to_utf32(utf8);
+    free(utf8);
+    return utf32;
+}
+
+uint32_t* utf32_format_int(int val) {
+    size_t len = snprintf(NULL, 0, "%d", val);
+    uint8_t* utf8 = malloc(len+1);
+    snprintf((char*)utf8, len+1, "%d", val);
+    uint32_t* utf32 = utf8_to_utf32(utf8);
+    free(utf8);
+    return utf32;
 }

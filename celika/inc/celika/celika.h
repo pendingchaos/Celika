@@ -17,4 +17,4 @@ void celika_game_event(SDL_Event event);
 void celika_game_frame(size_t w, size_t h, float frametime);
 void celika_game_deinit();
 float celika_get_display_frametime();
-void celika_set_title(const char* fmt, ...);
+void celika_set_title(uint32_t* fmt, ...);

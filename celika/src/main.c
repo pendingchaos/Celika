@@ -2,6 +2,7 @@
 #include "draw.h"
 #include "game.h"
 #include "font.h"
+#include "str.h"
 
 #include <SDL2/SDL.h>
 #include <stdbool.h>
@@ -44,13 +45,13 @@ float celika_get_display_frametime() {
     return max_frametime;
 }
 
-void celika_set_title(const char* fmt, ...) {
+void celika_set_title(uint32_t* fmt, ...) {
     va_list list, list2;
     va_start(list, fmt);
     va_copy(list2, list);
     
-    char dummy_buf[1];
-    int count = vsnprintf(dummy_buf, 1, fmt, list2);
+    uint32_t dummy_buf[1];
+    int count = utf32_vformat(NULL, 0, fmt, list2);
     if (count < 0) {
         va_end(list2);
         va_end(list);
@@ -59,10 +60,12 @@ void celika_set_title(const char* fmt, ...) {
     
     va_end(list2);
     
-    char* title = malloc(count+1);
-    vsnprintf(title, count+1, fmt, list);
+    uint32_t* title = malloc(count*4+4);
+    utf32_vformat(title, count+1, fmt, list);
     
-    SDL_SetWindowTitle(celika_window, title);
+    uint8_t* utf8 = utf32_to_utf8(title);
+    SDL_SetWindowTitle(celika_window, (char*)utf8);
+    free(utf8);
     
     free(title);
     
