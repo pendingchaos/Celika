@@ -17,8 +17,8 @@ typedef struct textedit_draw_callbacks_t {
     void (*draw_text)(uint32_t* codepoints, size_t line, void* userdata);
 } textedit_draw_callbacks_t;
 
-textedit_t* create_textedit(font_t* font, size_t height, bool single_line);
-void del_textedit(textedit_t* edit);
+textedit_t* textedit_create(font_t* font, size_t height, bool single_line);
+void textedit_del(textedit_t* edit);
 void textedit_event(textedit_t* edit, float left, float bottom, SDL_Event event);
 void textedit_draw(textedit_t* edit, textedit_draw_callbacks_t callbacks);
 const uint32_t* textedit_get(textedit_t* edit);

@@ -37,20 +37,20 @@ void celika_game_init(int* w, int* h) {
     *w = WINDOW_WIDTH;
     *h = WINDOW_HEIGHT;
     
-    player_tex = draw_create_scaled_tex(PLAYER_TEX, 0, 30, NULL, NULL);
-    enemy_tex[0] = draw_create_scaled_tex(ENEMY_TEX0, 0, 30, NULL, NULL);
-    enemy_tex[1] = draw_create_scaled_tex(ENEMY_TEX1, 0, 30, NULL, NULL);
-    enemy_tex[2] = draw_create_scaled_tex(ENEMY_TEX2, 0, 30, NULL, NULL);
-    enemy_tex[3] = draw_create_scaled_tex(ENEMY_TEX3, 0, 30, NULL, NULL);
-    player_proj_tex = draw_create_scaled_tex(PLAYER_PROJ_TEX, 0, 25, NULL, NULL);
-    enemy_proj_tex = draw_create_scaled_tex(ENEMY_PROJ_TEX, 0, 25, NULL, NULL);
-    collectable_tex[COLLECT_TYPE_HP] = draw_create_scaled_tex(HP_COLLECTABLE_TEX, 0, 25, NULL, NULL);
-    collectable_tex[COLLECT_TYPE_AMMO] = draw_create_scaled_tex(AMMO_COLLECTABLE_TEX, 0, 25, NULL, NULL);
-    collectable_tex[COLLECT_TYPE_SHIELD0] = draw_create_scaled_tex(SHIELD0_COLLECTABLE_TEX, 0, 25, NULL, NULL);
-    collectable_tex[COLLECT_TYPE_SHIELD1] = draw_create_scaled_tex(SHIELD1_COLLECTABLE_TEX, 0, 25, NULL, NULL);
-    collectable_tex[COLLECT_TYPE_SHIELD2] = draw_create_scaled_tex(SHIELD2_COLLECTABLE_TEX, 0, 25, NULL, NULL);
-    shield_tex = draw_create_scaled_tex(SHIELD_TEX, 0, 43, NULL, NULL);
-    button_tex = draw_create_scaled_tex(BUTTON_TEX, WINDOW_WIDTH*0.6, 0, NULL, NULL);
+    player_tex = draw_create_tex_scaled(PLAYER_TEX, 0, 30, NULL, NULL);
+    enemy_tex[0] = draw_create_tex_scaled(ENEMY_TEX0, 0, 30, NULL, NULL);
+    enemy_tex[1] = draw_create_tex_scaled(ENEMY_TEX1, 0, 30, NULL, NULL);
+    enemy_tex[2] = draw_create_tex_scaled(ENEMY_TEX2, 0, 30, NULL, NULL);
+    enemy_tex[3] = draw_create_tex_scaled(ENEMY_TEX3, 0, 30, NULL, NULL);
+    player_proj_tex = draw_create_tex_scaled(PLAYER_PROJ_TEX, 0, 25, NULL, NULL);
+    enemy_proj_tex = draw_create_tex_scaled(ENEMY_PROJ_TEX, 0, 25, NULL, NULL);
+    collectable_tex[COLLECT_TYPE_HP] = draw_create_tex_scaled(HP_COLLECTABLE_TEX, 0, 25, NULL, NULL);
+    collectable_tex[COLLECT_TYPE_AMMO] = draw_create_tex_scaled(AMMO_COLLECTABLE_TEX, 0, 25, NULL, NULL);
+    collectable_tex[COLLECT_TYPE_SHIELD0] = draw_create_tex_scaled(SHIELD0_COLLECTABLE_TEX, 0, 25, NULL, NULL);
+    collectable_tex[COLLECT_TYPE_SHIELD1] = draw_create_tex_scaled(SHIELD1_COLLECTABLE_TEX, 0, 25, NULL, NULL);
+    collectable_tex[COLLECT_TYPE_SHIELD2] = draw_create_tex_scaled(SHIELD2_COLLECTABLE_TEX, 0, 25, NULL, NULL);
+    shield_tex = draw_create_tex_scaled(SHIELD_TEX, 0, 43, NULL, NULL);
+    button_tex = draw_create_tex_scaled(BUTTON_TEX, WINDOW_WIDTH*0.6, 0, NULL, NULL);
     background_tex[0] = draw_create_tex(BG0_TEX, NULL, NULL);
     background_tex[1] = draw_create_tex(BG1_TEX, NULL, NULL);
     background_tex[2] = draw_create_tex(BG2_TEX, NULL, NULL);
@@ -68,7 +68,7 @@ void celika_game_init(int* w, int* h) {
     
     passthough_effect = draw_create_effect("shaders/passthough.glsl");
     
-    font = create_font(FONT);
+    font = font_create(FONT);
     
     menu = MENU_MAIN;
     play_init();
@@ -77,7 +77,7 @@ void celika_game_init(int* w, int* h) {
 void celika_game_deinit() {
     play_deinit();
     
-    del_font(font);
+    font_del(font);
     
     draw_del_effect(passthough_effect);
     

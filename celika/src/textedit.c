@@ -66,7 +66,7 @@ void get_row_layout(StbTexteditRow* row, textedit_str_t* obj, int n) {
     codepoints[num_codepoints] = 0;
     
     row->x0 = 0;
-    row->x1 = draw_text_font_width(obj->textedit->font, codepoints,
+    row->x1 = font_drawn_width(obj->textedit->font, codepoints,
                                    obj->textedit->height);
     row->baseline_y_delta = obj->textedit->height;
     row->ymin = line*obj->textedit->height;
@@ -113,7 +113,7 @@ float get_width(textedit_str_t* obj, int n, int i) {
 #define STB_TEXTEDIT_IMPLEMENTATION
 #include "stb_textedit.h"
 
-textedit_t* create_textedit(font_t* font, size_t height, bool single_line) {
+textedit_t* textedit_create(font_t* font, size_t height, bool single_line) {
     textedit_t* res = malloc(sizeof(textedit_t));
     res->font = font;
     res->height = height;
@@ -125,7 +125,7 @@ textedit_t* create_textedit(font_t* font, size_t height, bool single_line) {
     return res;
 }
 
-void del_textedit(textedit_t* textedit) {
+void textedit_del(textedit_t* textedit) {
     free(textedit->str.codepoints);
     free(textedit);
 }
@@ -310,5 +310,5 @@ aabb_t textedit_calc_aabb(textedit_t* edit, float left, float bottom) {
     width = fmax(width, row_width);
     height += edit->height;
     
-    return create_aabb_lbwh(left, bottom, width, height);
+    return aabb_create_lbwh(left, bottom, width, height);
 }

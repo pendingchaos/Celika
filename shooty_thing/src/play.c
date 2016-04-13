@@ -162,7 +162,7 @@ static void update_proj(float frametime) {
             continue;
         }
         
-        if (intersect_aabb(*aabb, player_aabb)) {
+        if (aabb_intersect(*aabb, player_aabb)) {
             list_remove(aabb);
             i--;
             player_hp -= ENEMY_PROJ_HIT_DAMAGE * (1-shield_reduce[shield_strength]);
@@ -188,7 +188,7 @@ static void update_enemies(float frametime) {
             continue;
         }
         
-        if (intersect_aabb(enemy->aabb, player_aabb)) {
+        if (aabb_intersect(enemy->aabb, player_aabb)) {
             enemy->destroyed = true;
             player_hp -= ENEMY_HIT_DAMAGE * (1-shield_reduce[shield_strength]);
         }
@@ -204,7 +204,7 @@ static void update_enemies(float frametime) {
         
         for (size_t j = 0; j < list_len(player_proj); j++) {
             aabb_t* proj = list_nth(player_proj, j);
-            if (intersect_aabb(enemy->aabb, *proj)) {
+            if (aabb_intersect(enemy->aabb, *proj)) {
                 list_remove(proj);
                 j--;
                 enemy->destroyed = true;
@@ -249,7 +249,7 @@ static void update_collectables(float frametime) {
                 continue;
             }
             
-            if (intersect_aabb(collectable->aabb, player_aabb)) {
+            if (aabb_intersect(collectable->aabb, player_aabb)) {
                 collectable->taken = true;
                 switch (type) {
                 case COLLECT_TYPE_AMMO:
@@ -345,19 +345,19 @@ static void setup_state() {
     shield_timeleft = 0;
     req_enemy_count = 1;
     
-    player_proj = list_new(sizeof(aabb_t));
-    enemy_proj = list_new(sizeof(aabb_t));
-    enemies = list_new(sizeof(enemy_t));
+    player_proj = list_create(sizeof(aabb_t));
+    enemy_proj = list_create(sizeof(aabb_t));
+    enemies = list_create(sizeof(enemy_t));
     for (size_t i = 0; i < COLLECT_TYPE_MAX; i++)
-        collectables[i] = list_new(sizeof(collectable_t));
+        collectables[i] = list_create(sizeof(collectable_t));
 }
 
 static void cleanup_state() {
     for (size_t i = 0; i < COLLECT_TYPE_MAX; i++)
-        list_free(collectables[i]);
-    list_free(enemies);
-    list_free(enemy_proj);
-    list_free(player_proj);
+        list_del(collectables[i]);
+    list_del(enemies);
+    list_del(enemy_proj);
+    list_del(player_proj);
 }
 
 void play_init() {
@@ -410,7 +410,7 @@ void play_frame(size_t w, size_t h, float frametime) {
                 float pos[] = {x*bb.width, y*bb.height};
                 pos[1] -= ((int)background_scroll) % (int)bb.height;
                 float size[] = {bb.width, bb.height};
-                draw_add_rect(pos, size, draw_rgba(1, 1, 1, background_alpha[i]));
+                draw_add_rect(pos, size, draw_create_rgba(1, 1, 1, background_alpha[i]));
             }
         }
         draw_set_tex(NULL);
@@ -420,7 +420,7 @@ void play_frame(size_t w, size_t h, float frametime) {
     
     {
         draw_set_tex(player_tex);
-        draw_add_aabb(player_aabb, draw_rgb(1, 1, 1));
+        draw_add_aabb(player_aabb, draw_create_rgb(1, 1, 1));
         
         if (shield_strength != SHIELD_NONE) {
             aabb_t aabb = draw_get_tex_aabb(shield_tex);
@@ -435,11 +435,11 @@ void play_frame(size_t w, size_t h, float frametime) {
             draw_set_tex(shield_tex);
             draw_col_t col;
             switch (shield_strength) {
-            case SHIELD_WEAK: col = draw_rgb(1, 0.5, 0.5); break;
-            case SHIELD_GOOD: col = draw_rgb(1, 1, 0.5); break;
-            case SHIELD_STRONG: col = draw_rgb(0.5, 1, 0.5); break;
+            case SHIELD_WEAK: col = draw_create_rgb(1, 0.5, 0.5); break;
+            case SHIELD_GOOD: col = draw_create_rgb(1, 1, 0.5); break;
+            case SHIELD_STRONG: col = draw_create_rgb(0.5, 1, 0.5); break;
             }
-            draw_add_aabb(aabb, draw_rgba(col.r, col.g, col.b, alpha));
+            draw_add_aabb(aabb, draw_create_rgba(col.r, col.g, col.b, alpha));
         }
         
         draw_set_tex(NULL);
@@ -447,19 +447,19 @@ void play_frame(size_t w, size_t h, float frametime) {
     
     draw_set_tex(player_proj_tex);
     for (size_t i = 0; i < list_len(player_proj); i++)
-        draw_add_aabb(*(aabb_t*)list_nth(player_proj, i), draw_rgb(1, 1, 1));
+        draw_add_aabb(*(aabb_t*)list_nth(player_proj, i), draw_create_rgb(1, 1, 1));
     draw_set_tex(NULL);
     
     draw_set_tex(enemy_proj_tex);
     for (size_t i = 0; i < list_len(enemy_proj); i++)
-        draw_add_aabb(*(aabb_t*)list_nth(enemy_proj, i), draw_rgb(1, 1, 1));
+        draw_add_aabb(*(aabb_t*)list_nth(enemy_proj, i), draw_create_rgb(1, 1, 1));
     draw_set_tex(NULL);
     
     for (size_t i = 0; i < COLLECT_TYPE_MAX; i++) {
         draw_set_tex(collectable_tex[i]);
         for (size_t j = 0; j < list_len(collectables[i]); j++) {
             collectable_t* collectable = list_nth(collectables[i], j);
-            draw_add_aabb(collectable->aabb, draw_rgba(1, 1, 1, collectable->alpha));
+            draw_add_aabb(collectable->aabb, draw_create_rgba(1, 1, 1, collectable->alpha));
         }
     }
     draw_set_tex(NULL);
@@ -467,32 +467,32 @@ void play_frame(size_t w, size_t h, float frametime) {
     for (size_t i = 0; i < list_len(enemies); i++) {
         enemy_t* enemy = list_nth(enemies, i);
         draw_set_tex(enemy->tex);
-        draw_add_aabb(enemy->aabb, draw_rgba(1, 1, 1, enemy->alpha));
+        draw_add_aabb(enemy->aabb, draw_create_rgba(1, 1, 1, enemy->alpha));
     }
     draw_set_tex(NULL);
     
     {
         float pos[] = {0, 0};
         float size[] = {20, 100};
-        draw_add_rect(pos, size, draw_rgba(0.5, 0.5, 0.25, 0.5));
+        draw_add_rect(pos, size, draw_create_rgba(0.5, 0.5, 0.25, 0.5));
         size[1] *= player_hp;
-        draw_add_rect(pos, size, draw_rgb(1, 1, 0.5));
+        draw_add_rect(pos, size, draw_create_rgb(1, 1, 0.5));
     }
     
     {
         float pos[] = {20, 0};
         float size[] = {20, 100};
-        draw_add_rect(pos, size, draw_rgba(0.5, 0.25, 0.5, 0.5));
+        draw_add_rect(pos, size, draw_create_rgba(0.5, 0.25, 0.5, 0.5));
         size[1] *= player_ammo;
-        draw_add_rect(pos, size, draw_rgb(1, 0.5, 1));
+        draw_add_rect(pos, size, draw_create_rgb(1, 0.5, 1));
     }
     
     {
         char text[256];
         snprintf(text, sizeof(text), "Hit: %zu", player_hit);
         uint32_t* utf32 = utf8_to_utf32((uint8_t*)text);
-        float pos[] = {WINDOW_WIDTH-draw_text_font_width(font, utf32, 10), 2};
-        draw_text_font(font, utf32, pos, draw_rgb(0.5, 1, 1), 10);
+        float pos[] = {WINDOW_WIDTH-font_drawn_width(font, utf32, 10), 2};
+        font_draw(font, utf32, pos, draw_create_rgb(0.5, 1, 1), 10);
         free(utf32);
     }
     
@@ -501,8 +501,8 @@ void play_frame(size_t w, size_t h, float frametime) {
         snprintf(text, sizeof(text), "Accuracy: %.0f%c",
                  player_hit/(double)(player_hit+player_miss)*100, '%');
         uint32_t* utf32 = utf8_to_utf32((uint8_t*)text);
-        float pos[] = {WINDOW_WIDTH-draw_text_font_width(font, utf32, 10), 14};
-        draw_text_font(font, utf32, pos, draw_rgb(0.5, 1, 1), 10);
+        float pos[] = {WINDOW_WIDTH-font_drawn_width(font, utf32, 10), 14};
+        font_draw(font, utf32, pos, draw_create_rgb(0.5, 1, 1), 10);
         free(utf32);
     }
     

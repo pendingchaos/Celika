@@ -2,7 +2,7 @@
 
 #include <math.h>
 
-aabb_t create_aabb_lbwh(float l, float b, float w, float h) {
+aabb_t aabb_create_lbwh(float l, float b, float w, float h) {
     aabb_t res;
     res.left = l;
     res.bottom = b;
@@ -11,7 +11,7 @@ aabb_t create_aabb_lbwh(float l, float b, float w, float h) {
     return res;
 }
 
-aabb_t create_aabb_lbrt(float l, float b, float r, float t) {
+aabb_t aabb_create_lbrt(float l, float b, float r, float t) {
     aabb_t res;
     res.left = l;
     res.bottom = b;
@@ -20,7 +20,7 @@ aabb_t create_aabb_lbrt(float l, float b, float r, float t) {
     return res;
 }
 
-aabb_t create_aabb_ce(float cx, float cy, float ex, float ey) {
+aabb_t aabb_create_ce(float cx, float cy, float ex, float ey) {
     aabb_t res;
     res.left = cx - ex;
     res.bottom = cy - ey;
@@ -29,14 +29,14 @@ aabb_t create_aabb_ce(float cx, float cy, float ex, float ey) {
     return res;
 }
 
-aabb_t translate_aabb(aabb_t aabb, float tx, float ty) {
+aabb_t aabb_translate(aabb_t aabb, float tx, float ty) {
     aabb_t res = aabb;
     res.left += tx;
     res.bottom += ty;
     return res;
 }
 
-aabb_t scale_aabb(aabb_t aabb, float sx, float sy) {
+aabb_t aabb_scale(aabb_t aabb, float sx, float sy) {
     float left = aabb.left;
     float right = left + aabb.width;
     float bottom = aabb.bottom;
@@ -47,10 +47,10 @@ aabb_t scale_aabb(aabb_t aabb, float sx, float sy) {
     right = (right-cx)*sx + cx;
     bottom = (bottom-cy)*sy + cy;
     top = (top-cy)*sy + cy;
-    return create_aabb_lbrt(left, bottom, right, top);
+    return aabb_create_lbrt(left, bottom, right, top);
 }
 
-bool intersect_aabb(aabb_t a, aabb_t b) {
+bool aabb_intersect(aabb_t a, aabb_t b) {
     float exa = a.width / 2;
     float eya = a.height / 2;
     float exb = b.width / 2;

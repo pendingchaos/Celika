@@ -15,14 +15,14 @@ struct list_t {
     list_head_t* first;
 };
 
-list_t* list_new(size_t val_size) {
+list_t* list_create(size_t val_size) {
    list_t* list = malloc(sizeof(list_t));
    list->val_size = val_size;
    list->first = NULL;
    return list;
 }
 
-void list_free(list_t* list) {
+void list_del(list_t* list) {
     for (list_head_t* cur = list->first; cur;) {
         list_head_t* next = cur->next;
         free(cur);

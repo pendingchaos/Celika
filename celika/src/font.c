@@ -53,7 +53,7 @@ static font_face_t* get_face(font_t* font, size_t height) {
     
     FT_Set_Char_Size(new_face.face, 0, height*64, 96, 96); //TODO: the dpi might not be correct
     
-    new_face.glyphs = list_new(sizeof(glyph_t));
+    new_face.glyphs = list_create(sizeof(glyph_t));
     return list_append(font->faces, &new_face);
 }
 
@@ -126,25 +126,25 @@ void font_deinit() {
     FT_Done_FreeType(ft);
 }
 
-font_t* create_font(const char* filename) {
+font_t* font_create(const char* filename) {
     font_t* font = malloc(sizeof(font_t));
     strncpy(font->filename, filename, sizeof(font->filename));
-    font->faces = list_new(sizeof(font_face_t));
+    font->faces = list_create(sizeof(font_face_t));
     return font;
 }
 
-void del_font(font_t* font) {
+void font_del(font_t* font) {
     for (size_t i = 0; i < list_len(font->faces); i++) {
         font_face_t* face = list_nth(font->faces, i);
         
         for (size_t j = 0; j < list_len(face->glyphs); j++)
             draw_del_tex(((glyph_t*)list_nth(face->glyphs, j))->tex);
         
-        list_free(face->glyphs);
+        list_del(face->glyphs);
         FT_Done_Face(face->face);
     }
     
-    list_free(font->faces);
+    list_del(font->faces);
     free(font);
 }
 
@@ -173,7 +173,7 @@ float font_get_kerning_x(font_t* font, size_t height, uint32_t prev, uint32_t co
     return kern[0];
 }
 
-void draw_text_font(font_t* font, const uint32_t* text, const float* pos,
+void font_draw(font_t* font, const uint32_t* text, const float* pos,
                     draw_col_t col, size_t height) {
     float cur_pos[] = {pos[0], pos[1]};
     
@@ -207,7 +207,7 @@ void draw_text_font(font_t* font, const uint32_t* text, const float* pos,
     draw_set_tex(last_tex);
 }
 
-float draw_text_font_width(font_t* font, const uint32_t* text, size_t height) {
+float font_drawn_width(font_t* font, const uint32_t* text, size_t height) {
     float width = 0;
     for (const uint32_t* cur = text; *cur; cur++) {
         width += get_glyph(font, *cur, height)->tex_w;

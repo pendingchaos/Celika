@@ -4,7 +4,6 @@
 #include "draw.h"
 #include "list.h"
 #include "font.h"
-#include "game.h"
 #include "str.h"
 
 #include <stddef.h>

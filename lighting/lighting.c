@@ -50,15 +50,15 @@ void celika_game_event(SDL_Event event) {
 }
 
 void celika_game_frame(size_t w, size_t h, float frametime) {
-    draw_add_aabb(create_aabb_lbwh(0, 0, w, h), draw_rgb(1, 1, 1));
+    draw_add_aabb(aabb_create_lbwh(0, 0, w, h), draw_create_rgb(1, 1, 1));
     
     int mx, my;
     SDL_GetMouseState(&mx, &my);
     light_x = mx;
     light_y = 500 - my;
     
-    #define BOX_SHADOW(x, y) draw_shadow(create_aabb_ce(x, y, 20, 20),\
-                                         100000, draw_rgb(0.0, 0.0, 0.0));
+    #define BOX_SHADOW(x, y) draw_shadow(aabb_create_ce(x, y, 20, 20),\
+                                         100000, draw_create_rgb(0.0, 0.0, 0.0));
     BOX_SHADOW(265, 175)
     BOX_SHADOW(72, 110)
     BOX_SHADOW(132, 276)
@@ -66,8 +66,8 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
     BOX_SHADOW(381, 73)
     #undef BOX_SHADOW
     
-    #define BOX(x, y)  draw_add_aabb(create_aabb_ce(x, y, 20, 20),\
-                                     draw_rgb(1, 0.5, 0.5));
+    #define BOX(x, y)  draw_add_aabb(aabb_create_ce(x, y, 20, 20),\
+                                     draw_create_rgb(1, 0.5, 0.5));
     BOX(265, 175)
     BOX(72, 110)
     BOX(132, 276)
@@ -75,27 +75,27 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
     BOX(381, 73)
     #undef BOX
     
-    aabb_t light_aabb = create_aabb_ce(light_x, light_y, light_radius, light_radius);
+    aabb_t light_aabb = aabb_create_ce(light_x, light_y, light_radius, light_radius);
     draw_set_blend(BLEND_MULT);
     draw_set_tex(light_tex);
-    draw_add_aabb(light_aabb, draw_rgb(1, 1, 1));
+    draw_add_aabb(light_aabb, draw_create_rgb(1, 1, 1));
     draw_set_tex(NULL);
     
-    aabb_t left_aabb = create_aabb_lbwh(light_aabb.left-500, light_aabb.bottom-500,
+    aabb_t left_aabb = aabb_create_lbwh(light_aabb.left-500, light_aabb.bottom-500,
                                         500, 1000+light_radius);
-    draw_add_aabb(left_aabb, draw_rgb(0, 0, 0));
+    draw_add_aabb(left_aabb, draw_create_rgb(0, 0, 0));
     
-    aabb_t right_aabb = create_aabb_lbwh(aabb_right(light_aabb), light_aabb.bottom-500,
+    aabb_t right_aabb = aabb_create_lbwh(aabb_right(light_aabb), light_aabb.bottom-500,
                                          500, 1000+light_radius);
-    draw_add_aabb(right_aabb, draw_rgb(0, 0, 0));
+    draw_add_aabb(right_aabb, draw_create_rgb(0, 0, 0));
     
-    aabb_t bottom_aabb = create_aabb_lbwh(light_aabb.left, light_aabb.bottom-500,
+    aabb_t bottom_aabb = aabb_create_lbwh(light_aabb.left, light_aabb.bottom-500,
                                           light_radius*2, 500);
-    draw_add_aabb(bottom_aabb, draw_rgb(0, 0, 0));
+    draw_add_aabb(bottom_aabb, draw_create_rgb(0, 0, 0));
     
-    aabb_t top_aabb = create_aabb_lbwh(light_aabb.left, aabb_top(light_aabb),
+    aabb_t top_aabb = aabb_create_lbwh(light_aabb.left, aabb_top(light_aabb),
                                        light_radius*2, 500);
-    draw_add_aabb(top_aabb, draw_rgb(0, 0, 0));
+    draw_add_aabb(top_aabb, draw_create_rgb(0, 0, 0));
     
     draw_set_blend(BLEND_ALPHA);
     

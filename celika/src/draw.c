@@ -236,7 +236,7 @@ static draw_program_t create_program(const char* name, const char* vsource, cons
 }
 
 void draw_init() {
-    fb_pool.fbs = list_new(sizeof(draw_fb_t));
+    fb_pool.fbs = list_create(sizeof(draw_fb_t));
     
     #ifdef __EMSCRIPTEN__
     srgb_textures = lin_texture_read = lin_texture_write = lin_fb_write = false;
@@ -280,10 +280,10 @@ void draw_init() {
     
     builtin_font_tex = malloc(sizeof(draw_tex_t));
     builtin_font_tex->id = font_tex_id;
-    builtin_font_tex->aabb = create_aabb_lbwh(0, 0, BUILTIN_FONT_WIDTH*128,
+    builtin_font_tex->aabb = aabb_create_lbwh(0, 0, BUILTIN_FONT_WIDTH*128,
                                               BUILTIN_FONT_HEIGHT);
     
-    batches = list_new(sizeof(batch_t));
+    batches = list_create(sizeof(batch_t));
     
     printf("OpenGL version: %s\n", glGetString(GL_VERSION));
     printf("OpenGL vendor: %s\n", glGetString(GL_VENDOR));
@@ -336,7 +336,7 @@ void draw_deinit() {
         free(batch->col);
         free(batch->uv);
     }
-    list_free(batches);
+    list_del(batches);
     
     free(pos);
     free(col);
@@ -354,7 +354,7 @@ void draw_deinit() {
         glDeleteFramebuffers(1, &fb->fb);
         glDeleteTextures(1, &fb->tex);
     }
-    list_free(fb_pool.fbs);
+    list_del(fb_pool.fbs);
 }
 
 draw_tex_t* draw_create_tex(const char* filename, int* w, int* h) {
@@ -407,12 +407,12 @@ draw_tex_t* draw_create_tex_data(uint8_t* data, size_t w, size_t h, bool filteri
     
     draw_tex_t* res = malloc(sizeof(draw_tex_t));
     res->id = tex;
-    res->aabb = create_aabb_lbwh(0, 0, w, h);
+    res->aabb = aabb_create_lbwh(0, 0, w, h);
     
     return res;
 }
 
-draw_tex_t* draw_create_scaled_tex(const char* filename, int reqw, int reqh, int* destw, int* desth) {
+draw_tex_t* draw_create_tex_scaled(const char* filename, int reqw, int reqh, int* destw, int* desth) {
     int w, h;
     draw_tex_t* tex = draw_create_tex(filename, &w, &h);
     
@@ -436,8 +436,8 @@ draw_tex_t* draw_create_scaled_tex(const char* filename, int reqw, int reqh, int
     return tex;
 }
 
-draw_tex_t* draw_create_scaled_tex_aabb(const char* filename, int reqw, int reqh, aabb_t* aabb) {
-    draw_tex_t* tex = draw_create_scaled_tex(filename, reqw, reqh, NULL, NULL);
+draw_tex_t* draw_create_tex_scaled_aabb(const char* filename, int reqw, int reqh, aabb_t* aabb) {
+    draw_tex_t* tex = draw_create_tex_scaled(filename, reqw, reqh, NULL, NULL);
     if (aabb) *aabb = tex->aabb;
     return tex;
 }
@@ -481,13 +481,13 @@ draw_effect_t* draw_create_effect(const char* shdr_fname) {
     
     free(fsource);
     
-    effect->params = list_new(sizeof(effect_param_t));
+    effect->params = list_create(sizeof(effect_param_t));
     
     return effect;
 }
 
 void draw_del_effect(draw_effect_t* effect) {
-    list_free(effect->params);
+    list_del(effect->params);
     glDeleteProgram(effect->program.program_lin);
     glDeleteProgram(effect->program.program_srgb);
     free(effect);
@@ -704,8 +704,8 @@ void draw_prims() {
     batch.uv = uv;
     draw_batch(batch);
     
-    list_free(batches);
-    batches = list_new(sizeof(batch_t));
+    list_del(batches);
+    batches = list_create(sizeof(batch_t));
     
     vert_count = 0;
     pos = col = uv = NULL;
@@ -853,11 +853,11 @@ float draw_text_width(const char* text, float height) {
     return height/BUILTIN_FONT_HEIGHT * BUILTIN_FONT_WIDTH * strlen(text);
 }
 
-draw_col_t draw_rgb(float r, float g, float b) {
-    return draw_rgba(r, g, b, 1);
+draw_col_t draw_create_rgb(float r, float g, float b) {
+    return draw_create_rgba(r, g, b, 1);
 }
 
-draw_col_t draw_rgba(float r, float g, float b, float a) {
+draw_col_t draw_create_rgba(float r, float g, float b, float a) {
     draw_col_t res;
     res.r = r;
     res.g = g;

@@ -40,13 +40,13 @@ static void draw_snake() {
         snake_bit_t* bit = list_nth(bits, i);
         float pos[] = {TILE_SIZE*(int)bit->x, TILE_SIZE*(int)bit->y};
         float size[] = {TILE_SIZE, TILE_SIZE};
-        draw_add_rect(pos, size, draw_rgb(0.5, 1, 0.5));
+        draw_add_rect(pos, size, draw_create_rgb(0.5, 1, 0.5));
     }
     
     snake_bit_t* head = list_nth(bits, 0);
     float pos[] = {TILE_SIZE*(int)head->x, TILE_SIZE*(int)head->y};
     float size[] = {TILE_SIZE, TILE_SIZE};
-    draw_add_rect(pos, size, draw_rgb(0.2, 1, 0.2));
+    draw_add_rect(pos, size, draw_create_rgb(0.2, 1, 0.2));
 }
 
 static void draw_yumyums() {
@@ -54,7 +54,7 @@ static void draw_yumyums() {
         yumyum_t* yumyum = yumyums + i;
         float pos[] = {TILE_SIZE*yumyum->x, TILE_SIZE*yumyum->y};
         float size[] = {TILE_SIZE, TILE_SIZE};
-        draw_add_rect(pos, size, draw_rgb(1, 0.5, 0.5));
+        draw_add_rect(pos, size, draw_create_rgb(1, 0.5, 0.5));
     }
 }
 
@@ -156,7 +156,7 @@ static void setup_state() {
     snake_bit_t head;
     head.x = head.y = 0;
     
-    bits = list_new(sizeof(snake_bit_t));
+    bits = list_create(sizeof(snake_bit_t));
     list_append(bits, &head);
     
     for (size_t i = 0; i < NUM_YUMYUMS; i++) {
@@ -175,7 +175,7 @@ static void setup_state() {
 }
 
 static void free_state() {
-    list_free(bits);
+    list_del(bits);
 }
 
 void celika_game_init(int* w, int* h) {
@@ -195,7 +195,7 @@ void celika_game_event(SDL_Event event) {
 }
 
 void celika_game_frame(size_t w, size_t h, float frametime) {
-    draw_add_aabb(create_aabb_lbwh(0, 0, w, h), draw_rgb(0.5, 0.5, 1));
+    draw_add_aabb(aabb_create_lbwh(0, 0, w, h), draw_create_rgb(0.5, 0.5, 1));
     
     update_snake(frametime);
     

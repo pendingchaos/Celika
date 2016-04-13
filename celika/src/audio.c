@@ -14,24 +14,24 @@ struct sound_t {
     short* samples; //interleaved stereo samples
 };
 
-typedef struct audio_source_t {
+typedef struct audio_src_t {
     sound_t* sound;
     size_t offset; //in samples with a frequency of spec.freq
     float volume;
     bool gc;
     bool done;
-} audio_source_t;
+} audio_src_t;
 
 typedef struct music_t {
     size_t cur_track;
     size_t track_count;
     sound_t** tracks;
-    audio_source_t* source;
+    audio_src_t* source;
 } music_t;
 
 static SDL_AudioDeviceID dev;
 static SDL_AudioSpec spec;
-static list_t* sources; //list_t of audio_source_t
+static list_t* sources; //list_t of audio_src_t
 
 static void callback(void* userdata, Uint8* stream, int len) {
     bool clipping = false;
@@ -42,7 +42,7 @@ static void callback(void* userdata, Uint8* stream, int len) {
     size_t sample_count = len / 4;
     
     for (ptrdiff_t i = 0; i < list_len(sources); i++) {
-        audio_source_t* source = list_nth(sources, i);
+        audio_src_t* source = list_nth(sources, i);
         if (source->done) continue;
         sound_t* sound = source->sound;
         
@@ -80,7 +80,7 @@ static void callback(void* userdata, Uint8* stream, int len) {
 }
 
 void audio_init(size_t freq, size_t sample_buf_size) {
-    sources = list_new(sizeof(audio_source_t));
+    sources = list_create(sizeof(audio_src_t));
     
     spec.freq = freq;
     spec.format = AUDIO_S16;
@@ -99,7 +99,7 @@ void audio_init(size_t freq, size_t sample_buf_size) {
 
 void audio_deinit() {
     SDL_CloseAudioDevice(dev);
-    list_free(sources);
+    list_del(sources);
 }
 
 sound_t* audio_create_sound(const char* filename) {
@@ -165,10 +165,10 @@ void audio_del_sound(sound_t* sound) {
     }
 }
 
-audio_source_t* audio_play_sound(sound_t* sound, float volume, float offset, bool gc) {
+audio_src_t* audio_play_sound(sound_t* sound, float volume, float offset, bool gc) {
     SDL_LockAudioDevice(dev);
     
-    audio_source_t source;
+    audio_src_t source;
     source.sound = sound;
     sound->ref_count++;
     source.offset = offset * spec.freq;
@@ -177,47 +177,47 @@ audio_source_t* audio_play_sound(sound_t* sound, float volume, float offset, boo
     source.done = false;
     list_append(sources, &source);
     
-    audio_source_t* res = list_nth(sources, list_len(sources)-1);
+    audio_src_t* res = list_nth(sources, list_len(sources)-1);
     
     SDL_UnlockAudioDevice(dev);
     
     return res;
 }
 
-float audio_get_src_offset(audio_source_t* src) {
+float audio_get_src_offset(audio_src_t* src) {
     SDL_LockAudioDevice(dev);
     float offset = src->offset / (double)src->sound->sample_rate;
     SDL_UnlockAudioDevice(dev);
     return offset;
 }
 
-void audio_set_src_offset(audio_source_t* src, float offset) {
+void audio_set_src_offset(audio_src_t* src, float offset) {
     SDL_LockAudioDevice(dev);
     src->offset = offset * src->sound->sample_rate;
     SDL_UnlockAudioDevice(dev);
 }
 
-float audio_get_src_volume(audio_source_t* src) {
+float audio_get_src_volume(audio_src_t* src) {
     SDL_LockAudioDevice(dev);
     float volume = src->volume;
     SDL_UnlockAudioDevice(dev);
     return volume;
 }
 
-void audio_set_src_volume(audio_source_t* src, float volume) {
+void audio_set_src_volume(audio_src_t* src, float volume) {
     SDL_LockAudioDevice(dev);
     src->volume = volume;
     SDL_UnlockAudioDevice(dev);
 }
 
-bool audio_get_src_done(audio_source_t* src) {
+bool audio_get_src_done(audio_src_t* src) {
     SDL_LockAudioDevice(dev);
     bool done = src->done;
     SDL_UnlockAudioDevice(dev);
     return done;
 }
 
-void audio_del_src(audio_source_t* src) {
+void audio_del_src(audio_src_t* src) {
     SDL_LockAudioDevice(dev);
     audio_del_sound(src->sound);
     list_remove(src);

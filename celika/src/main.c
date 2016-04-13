@@ -1,8 +1,4 @@
-#include "audio.h"
-#include "draw.h"
-#include "game.h"
-#include "font.h"
-#include "str.h"
+#include "celika.h"
 
 #include <SDL2/SDL.h>
 #include <stdbool.h>
@@ -50,7 +46,6 @@ void celika_set_title(uint32_t* fmt, ...) {
     va_start(list, fmt);
     va_copy(list2, list);
     
-    uint32_t dummy_buf[1];
     int count = utf32_vformat(NULL, 0, fmt, list2);
     if (count < 0) {
         va_end(list2);
