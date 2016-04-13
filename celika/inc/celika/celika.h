@@ -7,6 +7,14 @@
 #include "game.h"
 #include "str.h"
 
-#include <SDL2/SDL_video.h>
+#include <stddef.h>
+#include <SDL2/SDL.h>
 
 extern SDL_Window* celika_window;
+
+void celika_game_init(int* w, int* h);
+void celika_game_event(SDL_Event event);
+void celika_game_frame(size_t w, size_t h, float frametime);
+void celika_game_deinit();
+float celika_get_display_frametime();
+void celika_set_title(const char* fmt, ...);

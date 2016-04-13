@@ -98,4 +98,6 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
     draw_add_aabb(top_aabb, draw_rgb(0, 0, 0));
     
     draw_set_blend(BLEND_ALPHA);
+    
+    celika_set_title("Lighting - %.0f fps", 1/celika_get_display_frametime());
 }

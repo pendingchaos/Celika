@@ -5,6 +5,7 @@
 
 #include <SDL2/SDL.h>
 #include <stdbool.h>
+#include <stdarg.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -20,6 +21,8 @@ static SDL_GLContext ctx = NULL;
 static bool running = true;
 static float frametime = 1 / 60.0;
 static Uint64 last_frame_start = 0;
+static float frametimes[64];
+static size_t next_frametime;
 
 static void quit(int ret) {
     celika_game_deinit();
@@ -32,6 +35,38 @@ static void quit(int ret) {
     SDL_Quit();
     
     exit(ret);
+}
+
+float celika_get_display_frametime() {
+    float max_frametime = frametimes[0];
+    for (size_t i = 1; i < 64; i++)
+        max_frametime = fmax(max_frametime, frametimes[i]);
+    return max_frametime;
+}
+
+void celika_set_title(const char* fmt, ...) {
+    va_list list, list2;
+    va_start(list, fmt);
+    va_copy(list2, list);
+    
+    char dummy_buf[1];
+    int count = vsnprintf(dummy_buf, 1, fmt, list2);
+    if (count < 0) {
+        va_end(list2);
+        va_end(list);
+        return;
+    }
+    
+    va_end(list2);
+    
+    char* title = malloc(count+1);
+    vsnprintf(title, count+1, fmt, list);
+    
+    SDL_SetWindowTitle(celika_window, title);
+    
+    free(title);
+    
+    va_end(list);
 }
 
 static void frame() {
@@ -60,20 +95,8 @@ static void frame() {
     frametime = (start-last_frame_start) / (double)SDL_GetPerformanceFrequency();
     last_frame_start = start;
     
-    static float frametimes[64];
-    static size_t next_frametime;
     frametimes[next_frametime] = frametime;
     next_frametime = (next_frametime+1) % 64;
-    
-    float max_frametime = frametimes[0];
-    for (size_t i = 1; i < 64; i++)
-        max_frametime = fmax(max_frametime, frametimes[i]);
-    
-    char title[256];
-    static const char* fmt = "%s - %.0f mspf - %.0f fps";
-    snprintf(title, sizeof(title), fmt, "Celika", max_frametime*1000, 1/max_frametime);
-    
-    SDL_SetWindowTitle(celika_window, title);
     
     #ifdef __EMSCRIPTEN__
     if (!running) emscripten_cancel_main_loop();

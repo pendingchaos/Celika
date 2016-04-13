@@ -231,7 +231,9 @@ void celika_game_event(SDL_Event event) {
 
 void celika_game_frame(size_t w, size_t h, float frametime) {
     draw_add_aabb(create_aabb_lbwh(0, 0, w, h), draw_rgb(1, 1, 1));
+    
+    celika_set_title("{title} - %.0f fps", 1/celika_get_display_frametime());
 }
-''')
+'''.replace("{title}", sys.argv[2]))
     
     os.system('%s gen' % sys.argv[0])

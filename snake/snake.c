@@ -208,4 +208,6 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
         free_state();
         setup_state();
     }
+    
+    celika_set_title("Snake - %.0f fps", 1/celika_get_display_frametime());
 }
