@@ -296,27 +296,25 @@ void draw_init() {
     "attribute vec2 aUv;\n"
     "varying vec2 vfUv;\n"
     "varying vec4 vfCol;\n"
-    "uniform vec2 uHalfDim;\n"
     "void main() {\n"
-    "    gl_Position = vec4((aPos-uHalfDim)/uHalfDim, 0.0, 1.0);\n"
+    "    gl_Position = vec4(aPos, 0.0, 1.0);\n"
     "    vfUv = aUv;\n"
     "    vfCol = aCol;\n"
     "}\n";
     
     const char* fsource =
-    "varying vec2 vfUv;\n"
     "varying vec4 vfCol;\n"
     "vec4 celika_main() {\n"
     "    return vfCol;\n"
     "}\n";
     
     const char* fsource_tex =
+    "#extension GL_EXT_gpu_shader4 : enable\n"
     "varying vec2 vfUv;\n"
     "varying vec4 vfCol;\n"
     "uniform sampler2D uTex;\n"
-    "uniform vec2 uTexDimMinusOne;\n"
     "vec4 celika_main() {\n"
-    "    vec4 col = TEXTURE2D(uTex, (vfUv*uTexDimMinusOne+vec2(0.315))/uTexDimMinusOne);"
+    "    vec4 col = TEXTURE2D(uTex, vfUv);\n"
     "    return vfCol * col;\n"
     "}\n";
     
@@ -565,17 +563,33 @@ void draw_add_tri(const float* tpos, const draw_col_t* tcol, const float* tuv) {
         y = (y-scale_origin_y)*scale_y + o1y;
         
         //Rotate
-        new_tpos[i] = x*orientation_cos - y*orientation_sin + orientation_origin_x;
-        new_tpos[i+1] = x*orientation_sin + y*orientation_cos + orientation_origin_y;
+        new_tpos[i] = floor(x*orientation_cos - y*orientation_sin + orientation_origin_x);
+        new_tpos[i+1] = floor(x*orientation_sin + y*orientation_cos + orientation_origin_y);
+        new_tpos[i] = (new_tpos[i]-width/2.0) / (width/2.0);
+        new_tpos[i+1] = (new_tpos[i+1]-height/2.0) / (height/2.0);
     }
     
     pos = realloc(pos, (vert_count+3)*8);
     col = realloc(col, (vert_count+3)*16);
     uv = realloc(uv, (vert_count+3)*8);
+    
     memcpy(pos+vert_count*2, new_tpos, 24);
+    
     for (size_t i = 0; i < 12; i++)
         col[vert_count*4+i] = tcol[i/4].rgba[i%4];
-    memcpy(uv+vert_count*2, tuv, 24);
+    
+    if (cur_tex) {
+        aabb_t aabb = cur_tex->aabb;
+        for (size_t i = 0; i < 6; i+=2) {
+            float u = tuv[i];
+            float v = tuv[i+1];
+            uv[vert_count*2+i] = (u*(aabb.width-1)*2+1) / (aabb.width*2);
+            uv[vert_count*2+i+1] = (v*(aabb.height-1)*2+1) / (aabb.height*2);
+        }
+    } else {
+        memcpy(uv+vert_count*2, tuv, 24);
+    }
+    
     vert_count += 3;
 }
 
@@ -650,17 +664,11 @@ static void draw_batch(batch_t batch) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, batch.tex->id);
         glUniform1i(glGetUniformLocation(program, "uTex"), 0);
-        GLint tex_dim_loc = glGetUniformLocation(program, "uTexDimMinusOne");
-        if (tex_dim_loc >= 0) {
-            aabb_t aabb = draw_get_tex_aabb(batch.tex);
-            glUniform2f(tex_dim_loc, aabb.width-1, aabb.height-1);
-        }
     }
     
     GLint pos_loc = glGetAttribLocation(program, "aPos");
     GLint col_loc = glGetAttribLocation(program, "aCol");
     GLint uv_loc = glGetAttribLocation(program, "aUv");
-    GLint dim_loc = glGetUniformLocation(program, "uHalfDim");
     
     glEnableVertexAttribArray(pos_loc);
     glEnableVertexAttribArray(col_loc);
@@ -679,8 +687,6 @@ static void draw_batch(batch_t batch) {
         glBufferData(GL_ARRAY_BUFFER, batch.vert_count*8, batch.uv, GL_STREAM_DRAW);
         glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
     }
-    
-    glUniform2f(dim_loc, width/2.0, height/2.0);
     
     glDrawArrays(GL_TRIANGLES, 0, batch.vert_count);
     

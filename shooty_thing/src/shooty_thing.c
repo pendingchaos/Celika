@@ -123,5 +123,5 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
     
     gui_end_frame();
     
-    celika_set_title(U"Shooty Thing - %.0f fps", 1/celika_get_display_frametime());
+    celika_set_title(U"Shooty Thing - %d fps", (int)(1/celika_get_display_frametime()));
 }

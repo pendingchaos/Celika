@@ -52,5 +52,5 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
     callbacks.draw_text = &draw_text_callback;
     textedit_draw(edit, callbacks);
     
-    celika_set_title(U"Text Input Test - %.0f fps", 1/celika_get_display_frametime());
+    celika_set_title(U"Text Input Test - %d fps", (int)(1/celika_get_display_frametime()));
 }

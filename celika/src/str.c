@@ -168,7 +168,7 @@ int utf32_vformat(uint32_t* dest, size_t dest_count, const uint32_t* fmt, va_lis
 int utf32_format(uint32_t* dest, size_t dest_count, const uint32_t* fmt, ...) {
     va_list list;
     va_start(list, fmt);
-    int res = utf32_format(dest, dest_count, fmt, list);
+    int res = utf32_vformat(dest, dest_count, fmt, list);
     va_end(list);
     return res;
 }

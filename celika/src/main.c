@@ -1,6 +1,7 @@
 #include "celika.h"
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_opengl.h>
 #include <stdbool.h>
 #include <stdarg.h>
 
@@ -97,7 +98,14 @@ static void frame() {
     next_frametime = (next_frametime+1) % 64;
     
     #ifdef __EMSCRIPTEN__
-    if (!running) emscripten_cancel_main_loop();
+    if (!running) {
+        glClearColor(0, 0, 0, 0);
+        glClear(GL_COLOR_BUFFER_BIT);
+        
+        SDL_GL_SwapWindow(celika_window);
+        
+        emscripten_cancel_main_loop();
+    }
     #endif
 }
 
