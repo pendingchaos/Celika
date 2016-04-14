@@ -2,6 +2,7 @@
 #include "list.h"
 #include "builtinfont.h"
 #include "stb_image.h"
+#include "stb_image_resize.h"
 
 #include <SDL2/SDL_opengl.h>
 #include <SDL2/SDL_video.h>
@@ -9,6 +10,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <assert.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
@@ -381,27 +383,80 @@ draw_tex_t* draw_create_tex(const char* filename, int* w, int* h) {
     return res;
 }
 
+float srgb_to_linear(float v) {
+    if (v < 0.04045) return v / 12.92;
+    else return powf((v+0.055)/1.055, 2.4);
+}
+
+float linear_to_srgb(float v) {
+    if (v <= 0.0031308) return v * 12.92;
+    else return 1.055 * powf(v, 1/2.4) - 0.055;
+}
+
+uint8_t* downscale(uint8_t* data, size_t width, size_t height, size_t* res_width_, size_t* res_height_) {
+    size_t res_width = fmax(width / 2, 1);
+    size_t res_height = fmax(height / 2, 1);
+    uint8_t* res = malloc(res_width*res_height*4);
+    
+    if (!stbir_resize_uint8_generic(data, width, height, width*4,
+                                    res, res_width, res_height, res_width*4,
+                                    4, 3, 0, STBIR_EDGE_CLAMP, STBIR_FILTER_DEFAULT,
+                                    STBIR_COLORSPACE_SRGB, NULL)) {
+        fprintf(stderr, "Failed to downscale image\n");
+        exit(1);
+    }
+    
+    *res_width_ = res_width;
+    *res_height_ = res_height;
+    
+    return res;
+}
+
 draw_tex_t* draw_create_tex_data(uint8_t* data, size_t w, size_t h, bool filtering) {
     GLuint tex;
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    
     #ifdef __EMSCRIPTEN__
-    //TODO: Mipmap generation
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB_ALPHA : GL_RGBA,
-                 w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    GLuint internal_format = srgb_textures ? GL_SRGB_ALPHA : GL_RGBA;
     #else
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
-    glTexImage2D(GL_TEXTURE_2D, 0, srgb_textures ? GL_SRGB8_ALPHA8 : GL_RGBA8,
-                 w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    GLuint internal_format = srgb_textures ? GL_SRGB8_ALPHA8 : GL_RGBA8;
     #endif
-    if (!filtering)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    if (filtering)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    else
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    
+    glTexImage2D(GL_TEXTURE_2D, 0, internal_format, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    
+    if (w && h && filtering) {
+        size_t prev_w = w;
+        size_t prev_h = h;
+        uint8_t* prev_data = data;
+        size_t level = 1;
+        while (true) {
+            size_t mipmap_width;
+            size_t mipmap_height;
+            uint8_t* mipmap = downscale(prev_data, prev_w, prev_h, &mipmap_width, &mipmap_height);
+            glTexImage2D(GL_TEXTURE_2D, level, internal_format,
+                         mipmap_width, mipmap_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, mipmap);
+            
+            level++;
+            prev_w = mipmap_width;
+            prev_h = mipmap_height;
+            if (prev_data != data) free(prev_data);
+            prev_data = mipmap;
+            
+            if (mipmap_width==1 && mipmap_height==1) break;
+        }
+        
+        if (prev_data != data) free(prev_data);
+    }
     
     draw_tex_t* res = malloc(sizeof(draw_tex_t));
     res->id = tex;

@@ -15,7 +15,7 @@
 #define ENEMY_TEX3 "SpaceShooterRedux/PNG/ufoYellow.png"
 #define PLAYER_PROJ_TEX "SpaceShooterRedux/PNG/Lasers/laserGreen10.png"
 #define ENEMY_PROJ_TEX "SpaceShooterRedux/PNG/Lasers/laserRed16.png"
-#define HP_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/pill_yellow.png"
+#define HP_COLLECTABLE_TEX "SpaceShooterRedux/Vector/sheet.svg.png"
 #define AMMO_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/bolt_gold.png"
 #define SHIELD0_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/shield_bronze.png"
 #define SHIELD1_COLLECTABLE_TEX "SpaceShooterRedux/PNG/Power-ups/shield_silver.png"
