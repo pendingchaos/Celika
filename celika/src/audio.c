@@ -4,6 +4,7 @@
 #include <vorbis/vorbisfile.h>
 #include <SDL2/SDL_audio.h>
 #include <stdbool.h>
+#include <endian.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -83,7 +84,7 @@ void audio_init(size_t freq, size_t sample_buf_size) {
     sources = list_create(sizeof(audio_src_t));
     
     spec.freq = freq;
-    spec.format = AUDIO_S16;
+    spec.format = AUDIO_S16SYS;
     spec.channels = 2;
     spec.samples = sample_buf_size;
     spec.callback = callback;
@@ -129,8 +130,12 @@ sound_t* audio_create_sound(const char* filename) {
     size_t offset = 0;
     while (true) {
         uint8_t buf[4096];
-        //TODO: This will not work with big-endian
-        long count = ov_read(&vf, (char*)buf, sizeof(buf), 0, 2, 1, &stream);
+        #if __BYTE_ORDER == __BIG_ENDIAN
+        int big_endian = 1;
+        #else
+        int big_endian = 0;
+        #endif
+        long count = ov_read(&vf, (char*)buf, sizeof(buf), big_endian, 2, 1, &stream);
         if (count < 0) {
             fprintf(stderr, "Failed to read from %s\n", filename);
             exit(EXIT_FAILURE);
