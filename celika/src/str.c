@@ -118,6 +118,60 @@ bool utf8_is_ascii(const uint8_t* str) {
     return true;
 }
 
+bool cmp_str(const uint32_t* str1, const uint32_t* str2) {
+    while (true) {
+        if (!*str1) return false;
+        if (!*str2) return true;
+        if (*str1 != *str2) return false;
+        str1++;
+        str2++;
+    }
+}
+
+int utf32_vscan(uint32_t* str, uint32_t* fmt, va_list list) {
+    uint32_t* cur = str;
+    while (*fmt) {
+        if (cmp_str(fmt, U"\\%")) {
+            if (*cur != '%') return -1;
+            fmt += 2;
+            cur++;
+        } else if (cmp_str(fmt, U"%f")) {
+            
+        } else if (cmp_str(fmt, U"%d")) {
+            int sign = 1;
+            if (*cur == '+') {
+                str++;
+            } else if (*cur == '-') {
+                sign = -1;
+                str++;
+            } else if (*cur<'0' || *cur>'9') {
+                return -1;
+            }
+            uint32_t* end = str;
+            while (*end>='0' && *end<='9') end++;
+            if (cur == end) return -1;
+            int mul = sign;
+            int res = 0;
+            for (end--; cur<=end; end++)
+                res += (*end-'0') * mul;
+            *va_arg(list, int*) = res;
+        } else {
+            if (*cur != *fmt) return -1;
+            fmt++;
+            cur++;
+        }
+    }
+    return cur - str;
+}
+
+int utf32_scan(uint32_t* str, uint32_t* fmt, ...) {
+    va_list list;
+    va_start(list, fmt);
+    int res = utf32_vscan(str, fmt, list);
+    va_end(list);
+    return res;
+}
+
 //TODO: This is far from complete
 int utf32_vformat(uint32_t* dest, size_t dest_count, const uint32_t* fmt, va_list list) {
     #define ADD(len_, s_) do {\
@@ -136,23 +190,20 @@ int utf32_vformat(uint32_t* dest, size_t dest_count, const uint32_t* fmt, va_lis
     size_t needed = 0;
     size_t left = dest_count;
     while (*fmt) {
-        if (*fmt == '%') {
-            fmt++;
-            if (*fmt=='s') {
-                uint32_t* s = va_arg(list, uint32_t*);
-                ADD(utf32_len(s), s);
-                fmt++;
-            } else if (*fmt == 'f') {
-                uint32_t* s = utf32_format_double(va_arg(list, double));
-                ADD(utf32_len(s), s);
-                free(s);
-                fmt++;
-            } else if (*fmt == 'd') {
-                uint32_t* s = utf32_format_int(va_arg(list, int));
-                ADD(utf32_len(s), s);
-                free(s);
-                fmt++;
-            }
+        if (cmp_str(fmt, U"%s")) {
+            uint32_t* s = va_arg(list, uint32_t*);
+            ADD(utf32_len(s), s);
+            fmt += 2;
+        } else if (cmp_str(fmt, U"%f")) {
+            uint32_t* s = utf32_format_double(va_arg(list, double));
+            ADD(utf32_len(s), s);
+            free(s);
+            fmt += 2;
+        } else if (cmp_str(fmt, U"%d")) {
+            uint32_t* s = utf32_format_int(va_arg(list, int));
+            ADD(utf32_len(s), s);
+            free(s);
+            fmt += 2;
         } else {
             ADD(1, fmt++);
         }

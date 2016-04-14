@@ -97,6 +97,12 @@ static void frame() {
     frametimes[next_frametime] = frametime;
     next_frametime = (next_frametime+1) % 64;
     
+    int v;
+    if (utf32_scan(U"aaa123bbb", U"aaa%dbbb", &v) < 0)
+        printf("Error from utf32_scan\n");
+    else
+        printf("%d\n", v);
+    running = false;
     #ifdef __EMSCRIPTEN__
     if (!running) {
         glClearColor(0, 0, 0, 0);
