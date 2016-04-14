@@ -307,7 +307,7 @@ static void update(float frametime) {
     for (size_t i = 0; i < list_len(enemies); i++)
         enemy_count += ((enemy_t*)list_nth(enemies, i))->destroyed ? 0 : 1;
     
-    for (size_t i = 0; i < ((int)req_enemy_count)-enemy_count; i++)
+    for (int i = 0; i < ((int)req_enemy_count)-enemy_count; i++)
         create_enemy();
     
     if (rand()/(double)RAND_MAX > (1.0-AMMO_COLLECTABLE_CHANCE*frametime))
@@ -324,7 +324,7 @@ static void update(float frametime) {
     
     if (rand()/(double)RAND_MAX > (1.0-SHIELD2_COLLECTABLE_CHANCE*frametime))
         create_collectable(COLLECT_TYPE_SHIELD2);
-    
+    player_hp = 1;
     if (player_hp <= 0) {
         cleanup_state();
         setup_state();
