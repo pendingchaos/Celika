@@ -120,23 +120,23 @@ bool utf8_is_ascii(const uint8_t* str) {
 
 bool cmp_str(const uint32_t* str1, const uint32_t* str2) {
     while (true) {
-        if (!*str1) return false;
         if (!*str2) return true;
+        if (!*str1) return false;
         if (*str1 != *str2) return false;
         str1++;
         str2++;
     }
 }
 
-int utf32_vscan(uint32_t* str, uint32_t* fmt, va_list list) {
-    uint32_t* cur = str;
+int utf32_vscan(const uint32_t* str, const uint32_t* fmt, va_list list) {
+    const uint32_t* cur = str;
     while (*fmt) {
         if (cmp_str(fmt, U"\\%")) {
             if (*cur != '%') return -1;
             fmt += 2;
             cur++;
         } else if (cmp_str(fmt, U"%f")) {
-            
+            //TODO
         } else if (cmp_str(fmt, U"%d")) {
             int sign = 1;
             if (*cur == '+') {
@@ -147,24 +147,27 @@ int utf32_vscan(uint32_t* str, uint32_t* fmt, va_list list) {
             } else if (*cur<'0' || *cur>'9') {
                 return -1;
             }
-            uint32_t* end = str;
+            const uint32_t* end = cur;
             while (*end>='0' && *end<='9') end++;
             if (cur == end) return -1;
             int mul = sign;
             int res = 0;
-            for (end--; cur<=end; end++)
-                res += (*end-'0') * mul;
+            for (const uint32_t* cur2 = end-1; cur<=cur2; cur2--, mul*=10)
+                res += (*cur2-'0') * mul;
             *va_arg(list, int*) = res;
+            cur = end;
+            fmt += 2;
         } else {
             if (*cur != *fmt) return -1;
             fmt++;
             cur++;
         }
     }
+    
     return cur - str;
 }
 
-int utf32_scan(uint32_t* str, uint32_t* fmt, ...) {
+int utf32_scan(const uint32_t* str, const uint32_t* fmt, ...) {
     va_list list;
     va_start(list, fmt);
     int res = utf32_vscan(str, fmt, list);
@@ -190,20 +193,38 @@ int utf32_vformat(uint32_t* dest, size_t dest_count, const uint32_t* fmt, va_lis
     size_t needed = 0;
     size_t left = dest_count;
     while (*fmt) {
+        int scanned, width, precision;
         if (cmp_str(fmt, U"%s")) {
             uint32_t* s = va_arg(list, uint32_t*);
             ADD(utf32_len(s), s);
             fmt += 2;
         } else if (cmp_str(fmt, U"%f")) {
-            uint32_t* s = utf32_format_double(va_arg(list, double));
+            uint32_t* s = utf32_format_double(va_arg(list, double), -1, -1);
             ADD(utf32_len(s), s);
             free(s);
             fmt += 2;
+        } else if ((scanned=utf32_scan(fmt, U"\\%%df", &width)) >= 0) {
+            uint32_t* s = utf32_format_double(va_arg(list, double), width, -1);
+            ADD(utf32_len(s), s);
+            free(s);
+            fmt += scanned;
+        } else if ((scanned=utf32_scan(fmt, U"\\%.%df", &precision)) >= 0) {
+            uint32_t* s = utf32_format_double(va_arg(list, double), -1, precision);
+            ADD(utf32_len(s), s);
+            free(s);
+            fmt += scanned;
+        } else if ((scanned=utf32_scan(fmt, U"\\%%d.%df", &width, &precision)) >= 0) {
+            uint32_t* s = utf32_format_double(va_arg(list, double), width, precision);
+            ADD(utf32_len(s), s);
+            free(s);
+            fmt += scanned;
         } else if (cmp_str(fmt, U"%d")) {
             uint32_t* s = utf32_format_int(va_arg(list, int));
             ADD(utf32_len(s), s);
             free(s);
             fmt += 2;
+        } else if (cmp_str(fmt, U"%")) {
+            return -1;
         } else {
             ADD(1, fmt++);
         }
@@ -224,10 +245,18 @@ int utf32_format(uint32_t* dest, size_t dest_count, const uint32_t* fmt, ...) {
     return res;
 }
 
-uint32_t* utf32_format_double(double val) {
-    size_t len = snprintf(NULL, 0, "%f", val);
+uint32_t* utf32_format_double(double val, int width, int precision) {
+    char fmt[23];
+    if (width>=0 && precision>=0)
+        snprintf(fmt, sizeof(fmt), "%c%d.%df", '%', width, precision);
+    else if (width >= 0)
+        snprintf(fmt, sizeof(fmt), "%c%df", '%', width);
+    else if (precision >= 0)
+        snprintf(fmt, sizeof(fmt), "%c.%df", '%', precision);
+    
+    size_t len = snprintf(NULL, 0, fmt, val);
     uint8_t* utf8 = malloc(len+1);
-    snprintf((char*)utf8, len, "%f", val);
+    snprintf((char*)utf8, len+1, fmt, val);
     uint32_t* utf32 = utf8_to_utf32(utf8);
     free(utf8);
     return utf32;
