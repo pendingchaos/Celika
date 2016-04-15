@@ -19,6 +19,10 @@ aabb_t aabb_scale(aabb_t aabb, float sx, float sy);
 bool aabb_intersect(aabb_t a, aabb_t b);
 float aabb_cx(aabb_t aabb);
 float aabb_cy(aabb_t aabb);
-float aabb_top(aabb_t aabb);
 float aabb_right(aabb_t aabb);
+float aabb_top(aabb_t aabb);
+void aabb_set_cx(aabb_t* aabb, float cx);
+void aabb_set_cy(aabb_t* aabb, float cy);
+void aabb_set_right(aabb_t* aabb, float right);
+void aabb_set_top(aabb_t* aabb, float top);
 #endif

@@ -1,3 +1,5 @@
+//TODO: Test this more thoroughly
+//TODO: This is not complete
 #include "str_format.h"
 #include "str.h"
 
@@ -18,7 +20,6 @@ static bool cmp_str(const uint32_t* str1, const uint32_t* str2) {
     }
 }
 
-//TODO: This is far from complete
 int utf32_vscan(const uint32_t* str, const uint32_t* fmt, va_list list) {
     const uint32_t* cur = str;
     while (*fmt) {
@@ -69,16 +70,16 @@ int utf32_scan(const uint32_t* str, const uint32_t* fmt, ...) {
     return res;
 }
 
-typedef enum fmt_spec_flags_t { //TODO: Support all of these
-    FMT_LEFT_JUSTIFY = 1<<0,
-    FMT_FORCE_SIGN = 1<<1, //done for integers
-    FMT_SPACE_IN_PLACE_OF_SIGN = 1<<2, //done for integers
-    FMT_HASH = 1<<3,
-    FMT_LEFT_PAD_WITH_ZEROS = 1<<4,
+typedef enum fmt_spec_flags_t {
+    FMT_LEFT_JUSTIFY = 1<<0, //todo
+    FMT_FORCE_SIGN = 1<<1, //done
+    FMT_SPACE_IN_PLACE_OF_SIGN = 1<<2, //done
+    FMT_HASH = 1<<3, //todo
+    FMT_LEFT_PAD_WITH_ZEROS = 1<<4, //todo
     FMT_WIDTH_AS_ARG = 1<<5, //done
     FMT_PRECISION_AS_ARG = 1<<6, //done
-    FMT_WIDTH = 1<<7,
-    FMT_PRECISION = 1<<8,
+    FMT_WIDTH = 1<<7, //todo
+    FMT_PRECISION = 1<<8, //done for non-scientific floats
     FMT_LENGTH = 1<<9 //done
 } fmt_spec_flags_t;
 
@@ -217,14 +218,14 @@ static uint32_t* format_float(long double val, size_t base, const uint32_t* char
     //Fractional part
     size_t zero_len = 0;
     for (size_t i = 0; i < prec; i++) {
-        size_t digit = (intmax_t)(floor(val*pow(10, i+1))) % 10;
+        size_t digit = (intmax_t)(floor(val*pow(base, i+1))) % base;
         if (!digit) zero_len++;
         else zero_len = 0;
         if (zero_len >= 2) {
             res[int_len+i] = 0;
             break;
         }
-        res[int_len+1+i] = U"0123456789"[digit];
+        res[int_len+1+i] = chars[digit];
     }
     
     if (!res[int_len+1]) res[int_len] = 0;
@@ -378,9 +379,11 @@ static uint32_t* format(fmt_spec_t spec, va_list list) {
     case FMTSPEC_FLOAT_SHORTEST_UPPER:
         break;
     case FMTSPEC_FLOAT_HEX_LOWER:
-        break;
+        return format_float(floating_point, 16, U"0123456789abcdef", force_sign,
+                            space_sign, width, precision);
     case FMTSPEC_FLOAT_HEX_UPPER:
-        break;
+        return format_float(floating_point, 16, U"0123456789ABCDEF", force_sign,
+                            space_sign, width, precision);
     case FMTSPEC_CHARACTER:
         break;
     case FMTSPEC_STRING: {
@@ -553,30 +556,4 @@ int utf32_format(uint32_t* dest, size_t dest_count, const uint32_t* fmt, ...) {
     int res = utf32_vformat(dest, dest_count, fmt, list);
     va_end(list);
     return res;
-}
-
-uint32_t* utf32_format_double(double val, int width, int precision) {
-    char fmt[23];
-    if (width>=0 && precision>=0)
-        snprintf(fmt, sizeof(fmt), "%c%d.%df", '%', width, precision);
-    else if (width >= 0)
-        snprintf(fmt, sizeof(fmt), "%c%df", '%', width);
-    else if (precision >= 0)
-        snprintf(fmt, sizeof(fmt), "%c.%df", '%', precision);
-    
-    size_t len = snprintf(NULL, 0, fmt, val);
-    uint8_t* utf8 = malloc(len+1);
-    snprintf((char*)utf8, len+1, fmt, val);
-    uint32_t* utf32 = utf8_to_utf32(utf8);
-    free(utf8);
-    return utf32;
-}
-
-uint32_t* utf32_format_int(int val) {
-    size_t len = snprintf(NULL, 0, "%d", val);
-    uint8_t* utf8 = malloc(len+1);
-    snprintf((char*)utf8, len+1, "%d", val);
-    uint32_t* utf32 = utf8_to_utf32(utf8);
-    free(utf8);
-    return utf32;
 }

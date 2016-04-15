@@ -78,3 +78,19 @@ float aabb_top(aabb_t aabb) {
 float aabb_right(aabb_t aabb) {
     return aabb.left + aabb.width;
 }
+
+void aabb_set_cx(aabb_t* aabb, float cx) {
+    aabb->left = cx - aabb->width/2;
+}
+
+void aabb_set_cy(aabb_t* aabb, float cy) {
+    aabb->bottom = cy - aabb->height/2;
+}
+
+void aabb_set_right(aabb_t* aabb, float right) {
+    aabb->left = right - aabb->width;
+}
+
+void aabb_set_top(aabb_t* aabb, float top) {
+    aabb->bottom = top - aabb->height;
+}

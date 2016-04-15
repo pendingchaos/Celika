@@ -193,11 +193,6 @@ elif sys.argv[1] == 'clean':
     try: os.remove('%s.html' % celika_projname)
     except OSError: pass
 elif sys.argv[1] == 'setup':
-    if os.path.exists('.git'):
-        init_git = confirm_overwrite_thing('git repository')
-    else:
-        init_git = True
-    
     if os.path.exists('celikafile.py'):
         init_celikafile = confirm_overwrite_thing(os.path.abspath('celikafile.py'))
     else:
@@ -207,9 +202,6 @@ elif sys.argv[1] == 'setup':
         init_main = confirm_overwrite_thing(os.path.abspath('main.c'))
     else:
         init_main = True
-    
-    if init_git:
-        os.system('git init')
     
     if init_celikafile:
         open('celikafile.py', 'w').write('''celika_src = '$(wildcard *.c)'
