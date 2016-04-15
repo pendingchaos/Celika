@@ -1,3 +1,4 @@
+#include "str_format.h"
 #include "textedit.h"
 #include "aabb.h"
 #include "audio.h"

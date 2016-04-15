@@ -324,7 +324,7 @@ static void update(float frametime) {
     
     if (rand()/(double)RAND_MAX > (1.0-SHIELD2_COLLECTABLE_CHANCE*frametime))
         create_collectable(COLLECT_TYPE_SHIELD2);
-    player_hp = 1;
+    
     if (player_hp <= 0) {
         cleanup_state();
         setup_state();
