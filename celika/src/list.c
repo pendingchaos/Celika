@@ -61,9 +61,9 @@ void* list_insert(list_t* list, size_t before, void* val) {
         list->first->prev = new;
         list->first = new;
     } else if (list->first) { //normal insert //TODO: test this
-        list_head_t* after = list_nth(list, before-1);
+        list_head_t* after = (list_head_t*)list_nth(list, before-1) - 1;
         new->prev = after;
-        new->next = NULL;
+        new->next = after->next;
         after->next = new;
     } else { //insert into empty list
         new->prev = new->next = NULL;

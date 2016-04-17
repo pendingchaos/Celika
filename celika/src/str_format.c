@@ -146,6 +146,13 @@ static const fmt_spec_length_t supported_lengths[] = {
 };
 
 static uint32_t* _format_int(uintmax_t val, size_t base, const uint32_t* chars) {
+    if (!val) {
+        uint32_t* mem = malloc(8);
+        mem[0] = chars[0];
+        mem[1] = 0;
+        return mem;
+    }
+    
     size_t digits = 0;
     for (intmax_t v = val; v; v/=base) digits++;
     
