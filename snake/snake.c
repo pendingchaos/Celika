@@ -202,8 +202,6 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
     draw_snake();
     draw_yumyums();
     
-    draw_prims();
-    
     if (state == STATE_LOST) {
         free_state();
         setup_state();

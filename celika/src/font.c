@@ -4,6 +4,7 @@
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include <math.h>
 
 static FT_Library ft;
 
@@ -92,7 +93,7 @@ static glyph_t* get_glyph(font_t* font, uint32_t codepoint, size_t height) {
             tex_data[(y*w+x)*4+3] = glyph->bitmap.buffer[(h-y-1)*glyph->bitmap.pitch+x];
         }
     }
-    new_glyph.tex = draw_create_tex_data(tex_data, w, h, false);
+    new_glyph.tex = draw_create_tex_data(tex_data, w, h, TEX_MAG_NEAREST|TEX_MIN_NEAREST);
     free(tex_data);
     
     return list_append(face->glyphs, &new_glyph);
@@ -194,6 +195,8 @@ void font_draw(font_t* font, const uint32_t* text, const float* pos,
         
         float bl[] = {cur_pos[0]+glyph->bearing_x, cur_pos[1]+glyph->bearing_y};
         float size[] = {glyph->tex_w, glyph->tex_h};
+        bl[0] = floor(bl[0]);
+        bl[1] = floor(bl[1]);
         draw_add_rect(bl, size, col);
         
         float kern[2];

@@ -85,9 +85,8 @@ static void frame() {
     int w, h;
     SDL_GetWindowSize(celika_window, &w, &h);
     
-    draw_begin(w, h);
     celika_game_frame(w, h, frametime);
-    draw_end();
+    draw_prims(w, h);
     
     SDL_GL_SwapWindow(celika_window);
     

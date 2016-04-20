@@ -39,7 +39,7 @@ void draw_shadow(aabb_t aabb, float length, draw_col_t col) {
 
 void celika_game_init(int* w, int* h) {
     *w = *h = 500;
-    light_tex = draw_create_tex("lighttex.png", NULL, NULL);
+    light_tex = draw_create_tex("lighttex.png", NULL, NULL, 0);
 }
 
 void celika_game_deinit() {

@@ -506,12 +506,12 @@ void play_frame(size_t w, size_t h, float frametime) {
         free(utf32);
     }
     
-    draw_fb_t* res = draw_prims_fb();
+    draw_tex_t* res = draw_prims_fb(w, h);
     
-    draw_effect_param_fb(passthough_effect, "tex", res);
-    draw_do_effect(passthough_effect);
+    draw_effect_param_tex(passthough_effect, "tex", res);
+    draw_do_effect(passthough_effect, w, h);
     
-    draw_free_fb(res);
+    draw_del_tex(res);
     
     last_menu = menu;
 }

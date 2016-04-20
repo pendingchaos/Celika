@@ -17,8 +17,13 @@
 #include <math.h>
 
 struct draw_tex_t {
-    GLuint id;
+    GLuint tex;
     aabb_t aabb;
+    int flags;
+    
+    //Framebuffer stuff
+    GLuint fb; //Zero if it is not a framebuffer texture
+    bool used;
 };
 
 typedef struct effect_param_t {
@@ -44,15 +49,8 @@ struct draw_effect_t {
     list_t* params; //list of effect_param_t
 };
 
-struct draw_fb_t {
-    bool used;
-    GLuint fb;
-    GLuint tex;
-    size_t w, h;
-};
-
 typedef struct fb_pool_t {
-    list_t* fbs; //list_t of draw_fb_t
+    list_t* fbs; //list_t of draw_tex_t
 } fb_pool_t;
 
 typedef struct batch_t {
@@ -75,8 +73,6 @@ static float* pos = NULL;
 static float* col = NULL;
 static float* uv = NULL;
 static list_t* batches; //list of batch_t
-static size_t width = 0;
-static size_t height = 0;
 static draw_tex_t* builtin_font_tex;
 static float orientation = 0;
 static float orientation_sin = 0;
@@ -94,11 +90,12 @@ static draw_program_t batch_program;
 static draw_program_t batch_program_tex;
 static fb_pool_t fb_pool;
 
-static draw_fb_t create_fb() {
-    draw_fb_t res;
-    res.w = width;
-    res.h = height;
+static draw_tex_t create_fb(size_t width, size_t height) {
+    draw_tex_t res;
+    res.aabb.width = width;
+    res.aabb.height = height;
     res.used = true;
+    res.flags = 0;
     
     glGenTextures(1, &res.tex);
     glBindTexture(GL_TEXTURE_2D, res.tex);
@@ -125,16 +122,16 @@ static draw_fb_t create_fb() {
     return res;
 }
 
-static draw_fb_t* get_fb() {
+static draw_tex_t* get_fb(size_t width, size_t height) {
     for (size_t i = 0; i < list_len(fb_pool.fbs); i++) {
-        draw_fb_t* fb = list_nth(fb_pool.fbs, i);
-        if (!fb->used) {
+        draw_tex_t* fb = list_nth(fb_pool.fbs, i);
+        if (!fb->used && fb->aabb.width==width && fb->aabb.height==height) {
             fb->used = true;
             return fb;
         }
     }
     
-    draw_fb_t fb = create_fb();
+    draw_tex_t fb = create_fb(width, height);
     list_append(fb_pool.fbs, &fb);
     return list_nth(fb_pool.fbs, list_len(fb_pool.fbs)-1);
 }
@@ -142,16 +139,16 @@ static draw_fb_t* get_fb() {
 static size_t get_fb_used_count() {
     size_t used_count = 0;
     for (size_t i = 0; i < list_len(fb_pool.fbs); i++)
-        used_count += ((draw_fb_t*)list_nth(fb_pool.fbs, i))->used ? 1 : 0;
+        used_count += ((draw_tex_t*)list_nth(fb_pool.fbs, i))->used ? 1 : 0;
     return used_count;
 }
 
-static void rel_fb(draw_fb_t* fb) {
+static void rel_fb(draw_tex_t* fb) {
     fb->used = false;
     
     while (get_fb_used_count() < list_len(fb_pool.fbs)/2) {
         for (size_t i = 0; i < list_len(fb_pool.fbs); i++) {
-            draw_fb_t* fb = list_nth(fb_pool.fbs, i);
+            draw_tex_t* fb = list_nth(fb_pool.fbs, i);
             if (!fb->used) {
                 glDeleteFramebuffers(1, &fb->fb);
                 glDeleteTextures(1, &fb->tex);
@@ -238,7 +235,7 @@ static draw_program_t create_program(const char* name, const char* vsource, cons
 }
 
 void draw_init() {
-    fb_pool.fbs = list_create(sizeof(draw_fb_t));
+    fb_pool.fbs = list_create(sizeof(draw_tex_t));
     
     #ifdef __EMSCRIPTEN__
     srgb_textures = lin_texture_read = lin_texture_write = lin_fb_write = false;
@@ -255,10 +252,6 @@ void draw_init() {
     glGenBuffers(1, &col_buf);
     glGenBuffers(1, &uv_buf);
     
-    GLuint font_tex_id;
-    glGenTextures(1, &font_tex_id);
-    glBindTexture(GL_TEXTURE_2D, font_tex_id);
-    
     uint8_t data[BUILTIN_FONT_WIDTH*BUILTIN_FONT_HEIGHT*128*4];
     
     for (size_t i = 0; i < 128; i++) {
@@ -273,17 +266,9 @@ void draw_init() {
         }
     }
     
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, BUILTIN_FONT_WIDTH*128,
-                 BUILTIN_FONT_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
-    builtin_font_tex = malloc(sizeof(draw_tex_t));
-    builtin_font_tex->id = font_tex_id;
-    builtin_font_tex->aabb = aabb_create_lbwh(0, 0, BUILTIN_FONT_WIDTH*128,
-                                              BUILTIN_FONT_HEIGHT);
+    builtin_font_tex = draw_create_tex_data(data, BUILTIN_FONT_WIDTH*128,
+                                            BUILTIN_FONT_HEIGHT,
+                                            TEX_MAG_NEAREST|TEX_MIN_NEAREST);
     
     batches = list_create(sizeof(batch_t));
     
@@ -342,7 +327,7 @@ void draw_deinit() {
     free(col);
     free(uv);
     
-    glDeleteTextures(1, &builtin_font_tex->id);
+    glDeleteTextures(1, &builtin_font_tex->tex);
     free(builtin_font_tex);
     
     glDeleteBuffers(1, &uv_buf);
@@ -350,14 +335,14 @@ void draw_deinit() {
     glDeleteBuffers(1, &pos_buf);
     
     for (size_t i = 0; i < list_len(fb_pool.fbs); i++) {
-        draw_fb_t* fb = list_nth(fb_pool.fbs, i);
+        draw_tex_t* fb = list_nth(fb_pool.fbs, i);
         glDeleteFramebuffers(1, &fb->fb);
         glDeleteTextures(1, &fb->tex);
     }
     list_del(fb_pool.fbs);
 }
 
-draw_tex_t* draw_create_tex(const char* filename, int* w, int* h) {
+draw_tex_t* draw_create_tex(const char* filename, int* w, int* h, int flags) {
     int width, height, comp;
     stbi_uc* data = stbi_load(filename, &width, &height, &comp, 4);
     if (!data) {
@@ -374,7 +359,7 @@ draw_tex_t* draw_create_tex(const char* filename, int* w, int* h) {
         }
     }
     
-    draw_tex_t* res = draw_create_tex_data(data, width, height, true);
+    draw_tex_t* res = draw_create_tex_data(data, width, height, flags);
     stbi_image_free(data);
     
     if (w) *w = width;
@@ -412,7 +397,7 @@ uint8_t* downscale(uint8_t* data, size_t width, size_t height, size_t* res_width
     return res;
 }
 
-draw_tex_t* draw_create_tex_data(uint8_t* data, size_t w, size_t h, bool filtering) {
+draw_tex_t* draw_create_tex_data(uint8_t* data, size_t w, size_t h, int flags) {
     GLuint tex;
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
@@ -426,15 +411,18 @@ draw_tex_t* draw_create_tex_data(uint8_t* data, size_t w, size_t h, bool filteri
     
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    if (filtering)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    else
+    
+    if (flags & TEX_MAG_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    
+    if (flags & TEX_MIN_NEAREST)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    else
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     
     glTexImage2D(GL_TEXTURE_2D, 0, internal_format, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     
-    if (w && h && filtering) {
+    if (w && h && !(flags&TEX_MIN_NEAREST)) {
         size_t prev_w = w;
         size_t prev_h = h;
         uint8_t* prev_data = data;
@@ -459,15 +447,16 @@ draw_tex_t* draw_create_tex_data(uint8_t* data, size_t w, size_t h, bool filteri
     }
     
     draw_tex_t* res = malloc(sizeof(draw_tex_t));
-    res->id = tex;
+    res->tex = tex;
     res->aabb = aabb_create_lbwh(0, 0, w, h);
+    res->flags = flags;
     
     return res;
 }
 
-draw_tex_t* draw_create_tex_scaled(const char* filename, int reqw, int reqh, int* destw, int* desth) {
+draw_tex_t* draw_create_tex_scaled(const char* filename, int reqw, int reqh, int* destw, int* desth, int flags) {
     int w, h;
-    draw_tex_t* tex = draw_create_tex(filename, &w, &h);
+    draw_tex_t* tex = draw_create_tex(filename, &w, &h, flags);
     
     if (reqw && reqh) {
         w = reqw;
@@ -489,15 +478,19 @@ draw_tex_t* draw_create_tex_scaled(const char* filename, int reqw, int reqh, int
     return tex;
 }
 
-draw_tex_t* draw_create_tex_scaled_aabb(const char* filename, int reqw, int reqh, aabb_t* aabb) {
-    draw_tex_t* tex = draw_create_tex_scaled(filename, reqw, reqh, NULL, NULL);
+draw_tex_t* draw_create_tex_scaled_aabb(const char* filename, int reqw, int reqh, aabb_t* aabb, int flags) {
+    draw_tex_t* tex = draw_create_tex_scaled(filename, reqw, reqh, NULL, NULL, flags);
     if (aabb) *aabb = tex->aabb;
     return tex;
 }
 
 void draw_del_tex(draw_tex_t* tex) {
-    glDeleteTextures(1, &tex->id);
-    free(tex);
+    if (tex->fb) {
+        rel_fb(tex);
+    } else {
+        glDeleteTextures(1, &tex->tex);
+        free(tex);
+    }
 }
 
 aabb_t draw_get_tex_aabb(draw_tex_t* tex) {
@@ -580,16 +573,6 @@ void draw_set_blend(blend_t blend) {
     cur_blend = blend;
 }
 
-void draw_begin(size_t w, size_t h) {
-    glViewport(0, 0, w, h);
-    width = w;
-    height = h;
-}
-
-void draw_end() {
-    draw_prims();
-}
-
 void draw_set_orientation(float degrees, float ox, float oy) {
     orientation = degrees / 180 * 3.14159;
     orientation_sin = sin(orientation);
@@ -618,10 +601,8 @@ void draw_add_tri(const float* tpos, const draw_col_t* tcol, const float* tuv) {
         y = (y-scale_origin_y)*scale_y + o1y;
         
         //Rotate
-        new_tpos[i] = floor(x*orientation_cos - y*orientation_sin + orientation_origin_x);
-        new_tpos[i+1] = floor(x*orientation_sin + y*orientation_cos + orientation_origin_y);
-        new_tpos[i] = (new_tpos[i]-width/2.0) / (width/2.0);
-        new_tpos[i+1] = (new_tpos[i+1]-height/2.0) / (height/2.0);
+        new_tpos[i] = x*orientation_cos - y*orientation_sin + orientation_origin_x;
+        new_tpos[i+1] = x*orientation_sin + y*orientation_cos + orientation_origin_y;
     }
     
     pos = realloc(pos, (vert_count+3)*8);
@@ -684,7 +665,7 @@ void draw_add_aabb(aabb_t aabb, draw_col_t col) {
 
 static bool framebuffer_bound = false;
 
-static void draw_batch(batch_t batch) {
+static void draw_batch(batch_t batch, size_t viewport_width, size_t viewport_height) {
     if (!batch.vert_count) return;
     
     if (batch.blend == BLEND_NONE) glDisable(GL_BLEND);
@@ -717,7 +698,7 @@ static void draw_batch(batch_t batch) {
     
     if (batch.tex) {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, batch.tex->id);
+        glBindTexture(GL_TEXTURE_2D, batch.tex->tex);
         glUniform1i(glGetUniformLocation(program, "uTex"), 0);
     }
     
@@ -728,6 +709,11 @@ static void draw_batch(batch_t batch) {
     glEnableVertexAttribArray(pos_loc);
     glEnableVertexAttribArray(col_loc);
     if (batch.tex) glEnableVertexAttribArray(uv_loc);
+    
+    for (size_t i = 0; i < batch.vert_count*2; i+=2) {
+        batch.pos[i] = (batch.pos[i]-viewport_width/2.0) / (viewport_width/2.0);
+        batch.pos[i+1] = (batch.pos[i+1]-viewport_height/2.0) / (viewport_height/2.0);
+    }
     
     glBindBuffer(GL_ARRAY_BUFFER, pos_buf);
     glBufferData(GL_ARRAY_BUFFER, batch.vert_count*8, batch.pos, GL_STREAM_DRAW);
@@ -750,11 +736,11 @@ static void draw_batch(batch_t batch) {
     free(batch.uv);
 }
 
-void draw_prims() {
-    glViewport(0, 0, width, height);
+void draw_prims(size_t viewport_width, size_t viewport_height) {
+    glViewport(0, 0, viewport_width, viewport_height);
     
     for (size_t i = 0; i < list_len(batches); i++)
-        draw_batch(*(batch_t*)list_nth(batches, i));
+        draw_batch(*(batch_t*)list_nth(batches, i), viewport_width, viewport_height);
     
     batch_t batch;
     batch.tex = cur_tex;
@@ -763,7 +749,7 @@ void draw_prims() {
     batch.pos = pos;
     batch.col = col;
     batch.uv = uv;
-    draw_batch(batch);
+    draw_batch(batch, viewport_width, viewport_height);
     
     list_del(batches);
     batches = list_create(sizeof(batch_t));
@@ -772,12 +758,12 @@ void draw_prims() {
     pos = col = uv = NULL;
 }
 
-draw_fb_t* draw_prims_fb() {
-    draw_fb_t* res = get_fb();
+draw_tex_t* draw_prims_fb(size_t viewport_width, size_t viewport_height) {
+    draw_tex_t* res = get_fb(viewport_width, viewport_height);
     glBindFramebuffer(GL_FRAMEBUFFER, res->fb);
     framebuffer_bound = true;
     
-    draw_prims();
+    draw_prims(viewport_width, viewport_height);
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     framebuffer_bound = false;
@@ -806,16 +792,18 @@ void draw_effect_param_float(draw_effect_t* effect, const char* name, float val)
     effect_param(effect, name, param);
 }
 
-void draw_effect_param_fb(draw_effect_t* effect, const char* name, draw_fb_t* val) {
+void draw_effect_param_tex(draw_effect_t* effect, const char* name, draw_tex_t* val) {
     effect_param_t param;
     param.is_tex = true;
     param.tex.id = val->tex;
-    param.tex.w = val->w;
-    param.tex.h = val->h;
+    param.tex.w = val->aabb.width;
+    param.tex.h = val->aabb.height;
     effect_param(effect, name, param);
 }
 
-void draw_do_effect(draw_effect_t* effect) {
+void draw_do_effect(draw_effect_t* effect, size_t viewport_width, size_t viewport_height) {
+    glViewport(0, 0, viewport_width, viewport_height);
+    
     bool output_lin = framebuffer_bound ? lin_texture_write : lin_fb_write;
     GLuint program = output_lin ? effect->program.program_lin
                                 : effect->program.program_srgb;
@@ -866,21 +854,17 @@ void draw_do_effect(draw_effect_t* effect) {
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
-draw_fb_t* draw_do_effect_fb(draw_effect_t* effect) {
-    draw_fb_t* res = get_fb();
+draw_tex_t* draw_do_effect_fb(draw_effect_t* effect, size_t viewport_width, size_t viewport_height) {
+    draw_tex_t* res = get_fb(viewport_width, viewport_height);
     glBindFramebuffer(GL_FRAMEBUFFER, res->fb);
     framebuffer_bound = true;
     
-    draw_do_effect(effect);
+    draw_do_effect(effect, viewport_width, viewport_height);
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     framebuffer_bound = false;
     
     return res;
-}
-
-void draw_free_fb(draw_fb_t* fb) {
-    rel_fb(fb);
 }
 
 void draw_text(const char* text, const float* pos, draw_col_t col, float height) {
