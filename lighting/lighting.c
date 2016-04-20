@@ -1,8 +1,12 @@
 #include "celika/celika.h"
 
+#define SSAA 2
+#define RES_SIZE 500
+
 static float light_x, light_y;
 static float light_radius = 250;
 static draw_tex_t* light_tex;
+static draw_effect_t* downscale_effect;
 
 void draw_shadow_line(float x0, float y0, float x1, float y1,
                       float length, draw_col_t col) {
@@ -38,11 +42,13 @@ void draw_shadow(aabb_t aabb, float length, draw_col_t col) {
 }
 
 void celika_game_init(int* w, int* h) {
-    *w = *h = 500;
+    *w = *h = RES_SIZE;
     light_tex = draw_create_tex("lighttex.png", NULL, NULL, 0);
+    downscale_effect = draw_create_effect("supersample.glsl");
 }
 
 void celika_game_deinit() {
+    draw_del_effect(downscale_effect);
     draw_del_tex(light_tex);
 }
 
@@ -50,14 +56,16 @@ void celika_game_event(SDL_Event event) {
 }
 
 void celika_game_frame(size_t w, size_t h, float frametime) {
+    draw_set_scale(SSAA, SSAA, 0, 0);
+    
     draw_add_aabb(aabb_create_lbwh(0, 0, w, h), draw_create_rgb(1, 1, 1));
     
     int mx, my;
     SDL_GetMouseState(&mx, &my);
     light_x = mx;
-    light_y = 500 - my;
+    light_y = RES_SIZE - my - 1;
     
-    #define BOX_SHADOW(x, y) draw_shadow(aabb_create_ce(x, y, 20, 20),\
+    #define BOX_SHADOW(x, y) draw_shadow(aabb_create_ce((x), (y), 20, 20),\
                                          100000, draw_create_rgb(0.0, 0.0, 0.0));
     BOX_SHADOW(265, 175)
     BOX_SHADOW(72, 110)
@@ -98,6 +106,16 @@ void celika_game_frame(size_t w, size_t h, float frametime) {
     draw_add_aabb(top_aabb, draw_create_rgb(0, 0, 0));
     
     draw_set_blend(BLEND_ALPHA);
+    
+    draw_tex_t* tex = draw_prims_fb(w*SSAA, h*SSAA);
+    
+    draw_set_scale(0, 0, 0, 0);
+    
+    draw_effect_param_tex(downscale_effect, "uTex", tex);
+    draw_effect_param_float(downscale_effect, "uSSAA", SSAA);
+    draw_do_effect(downscale_effect, w, h);
+    
+    draw_del_tex(tex);
     
     celika_set_title(U"Lighting - %.0f fps", 1/celika_get_display_frametime());
 }

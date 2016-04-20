@@ -803,6 +803,7 @@ void draw_effect_param_tex(draw_effect_t* effect, const char* name, draw_tex_t* 
 
 void draw_do_effect(draw_effect_t* effect, size_t viewport_width, size_t viewport_height) {
     glViewport(0, 0, viewport_width, viewport_height);
+    glDisable(GL_BLEND);
     
     bool output_lin = framebuffer_bound ? lin_texture_write : lin_fb_write;
     GLuint program = output_lin ? effect->program.program_lin
