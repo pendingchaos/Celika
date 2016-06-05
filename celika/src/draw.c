@@ -200,14 +200,14 @@ output_srgb ? "    gl_FragColor = to_srgb(celika_main());\n" :
     glCompileShader(vert);
     char log[1024];
     glGetShaderInfoLog(vert, sizeof(log), NULL, log);
-    printf("%s vertex compile info log: %s\n", name, log);
+    if (strlen(log)) printf("%s vertex compile info log: %s\n", name, log);
     
     GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(frag, 8, (const GLchar**)fsources, NULL);
     glCompileShader(frag);
     memset(log, 0, sizeof(log));
     glGetShaderInfoLog(frag, sizeof(log), NULL, log);
-    printf("%s fragment compile info log: %s\n", name, log);
+    if (strlen(log)) printf("%s fragment compile info log: %s\n", name, log);
     
     GLuint program = glCreateProgram();
     glAttachShader(program, vert);
@@ -217,12 +217,12 @@ output_srgb ? "    gl_FragColor = to_srgb(celika_main());\n" :
     glDeleteShader(frag);
     memset(log, 0, sizeof(log));
     glGetProgramInfoLog(program, sizeof(log), NULL, log);
-    printf("%s link info log: %s\n", name, log);
+    if (strlen(log)) printf("%s link info log: %s\n", name, log);
     
     glValidateProgram(program);
     memset(log, 0, sizeof(log));
     glGetProgramInfoLog(program, sizeof(log), NULL, log);
-    printf("%s validate info log: %s\n", name, log);
+    if (strlen(log)) printf("%s validate info log: %s\n", name, log);
     
     return program;
 }
