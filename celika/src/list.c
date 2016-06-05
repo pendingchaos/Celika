@@ -35,7 +35,7 @@ void* list_append(list_t* list, void* val) {
     list_head_t* new = malloc(sizeof(list_head_t)+list->val_size);
     new->list = list;
     new->next = NULL;
-    memcpy(new+1, val, list->val_size);
+    if (val) memcpy(new+1, val, list->val_size);
     
     if (list->first) {
         list_head_t* last;
@@ -53,7 +53,7 @@ void* list_append(list_t* list, void* val) {
 void* list_insert(list_t* list, size_t before, void* val) {
     list_head_t* new = malloc(sizeof(list_head_t)+list->val_size);
     new->list = list;
-    memcpy(new+1, val, list->val_size);
+    if (val) memcpy(new+1, val, list->val_size);
     
     if (!before && list->first) { //insert beginning
         new->prev = NULL;
