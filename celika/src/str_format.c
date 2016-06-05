@@ -185,6 +185,7 @@ static uint32_t* format_int(intmax_t val, size_t base, const uint32_t* chars,
         uint32_t* res = malloc(utf32_len(formatted)*4+8);
         res[0] = sign;
         memcpy(res+1, formatted, utf32_len(formatted)*4+4);
+        free(formatted);
         return res;
     }
     
@@ -205,6 +206,7 @@ static uint32_t* format_uint(uintmax_t val, size_t base, const uint32_t* chars,
         uint32_t* res = malloc(utf32_len(formatted)*4+8);
         res[0] = sign;
         memcpy(res+1, formatted, utf32_len(formatted)*4+4);
+        free(formatted);
         return res;
     }
     
@@ -221,6 +223,8 @@ static uint32_t* format_float(long double val, size_t base, const uint32_t* char
     uint32_t* res = calloc(int_len+prec+2, 4);
     memcpy(res, int_part, int_len*4);
     res[int_len] = '.';
+    
+    free(int_part);
     
     //Fractional part
     size_t zero_len = 0;

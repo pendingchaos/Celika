@@ -83,14 +83,15 @@ static void callback(void* userdata, Uint8* stream, int len) {
 void audio_init(size_t freq, size_t sample_buf_size) {
     sources = list_create(sizeof(audio_src_t));
     
-    spec.freq = freq;
-    spec.format = AUDIO_S16SYS;
-    spec.channels = 2;
-    spec.samples = sample_buf_size;
-    spec.callback = callback;
-    spec.userdata = NULL;
+    SDL_AudioSpec desired;
+    desired.freq = freq;
+    desired.format = AUDIO_S16SYS;
+    desired.channels = 2;
+    desired.samples = sample_buf_size;
+    desired.callback = callback;
+    desired.userdata = NULL;
     
-    dev = SDL_OpenAudioDevice(NULL, SDL_FALSE, &spec, &spec,
+    dev = SDL_OpenAudioDevice(NULL, SDL_FALSE, &desired, &spec,
                               SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
     if (!dev) {
         fprintf(stderr, "Failed to open audio device: %s", SDL_GetError());
