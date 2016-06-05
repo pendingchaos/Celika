@@ -4,8 +4,6 @@
 
 #include <stddef.h>
 
-typedef void (*list_del_t)(void*);
-
 typedef struct list_t list_t;
 
 list_t* list_create(size_t val_size);
