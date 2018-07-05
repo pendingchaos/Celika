@@ -164,7 +164,7 @@ static GLuint _create_program(const char* name, const char* vsource, const char*
 #ifdef __EMSCRIPTEN__
 "precision highp float;\n"
 #else
-"#version 100\n"
+"#version 120\n"
 #endif
 "#line 1\n", vsource};
     
@@ -296,7 +296,6 @@ void draw_init() {
     "}\n";
     
     const char* fsource_tex =
-    "#extension GL_EXT_gpu_shader4 : enable\n"
     "varying vec2 vfUv;\n"
     "varying vec4 vfCol;\n"
     "uniform sampler2D uTex;\n"
